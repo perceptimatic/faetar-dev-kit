@@ -1,0 +1,14 @@
+name: mms-faetar
+channels:
+  - huggingface
+  - pytorch
+  - nvidia
+  - conda-forge
+  - nodefaults
+dependencies:
+  - datasets
+  - librosa
+  - evaluate
+  - pytorch-cuda
+  - jiwer
+  - transformers
