@@ -10,5 +10,7 @@ dependencies:
   - librosa
   - evaluate
   - pytorch-cuda
+  - pytorch
   - jiwer
   - transformers
+  - accelerate

@@ -141,11 +141,11 @@ class Options(object):
     # global kwargs
     unk: str = "[UNK]"
     pad: str = "[PAD]"
-    word_delimiter: str = "|"
+    word_delimiter: str = "_"
     sampling_rate: int = 16_000
 
     # global args
-    cmd: Literal["write-vocab"] = "write-vocab"
+    cmd: Literal["write-vocab", "train", "decode"]
 
     # write-vocab kwargs
     iso: str = "fae"  # There's no Faetar ISO 639 code, but "fae" isn't mapped yet
@@ -156,8 +156,21 @@ class Options(object):
     metadata_csv: pathlib.Path
     vocab_json: pathlib.Path
 
+    # train kwargs
+    pretrained_model_id: str = "facebook/mms-1b-all"
+
+    # train args
+    # vocab_json
+    train_data: pathlib.Path
+    dev_data: pathlib.Path
+    ckpt_dir: pathlib.Path
+
+    # decode args
+    # ckpt_dir
+    decode_data: pathlib.Path
+
     @classmethod
-    def add_vocab_args(cls, parser: argparse.ArgumentParser):
+    def add_write_vocab_args(cls, parser: argparse.ArgumentParser):
 
         cls._add_argument(
             parser, "--prune-count", type=NonnegType, help="Prune tokens <= this count"
@@ -180,6 +193,45 @@ class Options(object):
             "vocab_json",
             type=WriteFileType,
             help="Path to vocab.json file (output)",
+        )
+
+    @classmethod
+    def add_train_args(cls, parser: argparse.ArgumentParser):
+
+        cls._add_argument(
+            parser, "--pretrained-model-id", help="model to load from hub"
+        )
+
+        cls._add_argument(
+            parser, "vocab_json", type=ReadFileType, help="Path to vocab.json file"
+        )
+        cls._add_argument(
+            parser, "train_data", type=ReadDirType, help="Path to training AudioFolder"
+        )
+        cls._add_argument(
+            parser, "dev_data", type=ReadDirType, help="Path to development AudioFolder"
+        )
+        cls._add_argument(
+            parser,
+            "ckpt_dir",
+            type=WriteDirType,
+            help="Path to model checkpoint dir (output)",
+        )
+
+    @classmethod
+    def add_decode_args(cls, parser: argparse.ArgumentParser):
+
+        cls._add_argument(
+            parser,
+            "ckpt_dir",
+            type=ReadDirType,
+            help="Path to model checkpoint dir",
+        )
+        cls._add_argument(
+            parser,
+            "decode_data",
+            type=ReadDirType,
+            help="Path to AudioFolder to decode",
         )
 
     @classmethod
@@ -206,7 +258,12 @@ class Options(object):
         cmds = parser.add_subparsers(
             dest="cmd", required=True, description="Subcommand (see README)"
         )
-        vocab_parser = cmds.add_parser("write-vocab", help="Write vocab.json file")
-        cls.add_vocab_args(vocab_parser)
+        cls.add_write_vocab_args(
+            cmds.add_parser("write-vocab", help="Write vocab.json file")
+        )
+        cls.add_train_args(cmds.add_parser("train", help="fine-tune an mms model"))
+        cls.add_decode_args(
+            cmds.add_parser("decode", help="decode with fine-tuned mms model")
+        )
 
         return parser.parse_args(args, namespace=cls())

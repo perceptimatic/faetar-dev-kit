@@ -9,5 +9,9 @@ def main(args: Optional[Sequence[str]] = None) -> None:
         from .text import write_vocab
 
         write_vocab(options)
+    elif options.cmd == "train":
+        from .asr import train
+
+        train(options)
     else:
         raise NotImplementedError
