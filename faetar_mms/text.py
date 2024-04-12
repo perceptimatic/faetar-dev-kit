@@ -13,32 +13,58 @@
 # limitations under the License.
 
 import sys
+import json
 
 from csv import DictReader
 from collections import Counter
-from json import dump
 
 from .args import Options
 
 
 def write_vocab(options: Options):
 
-    csv = DictReader(options.metadata_csv.open())
+    if options.append:
+        with options.vocab_json.open() as fp:
+            vocab_json = json.load(fp)
+    else:
+        vocab_json = dict()
+
+    csv = DictReader(
+        options.metadata_csv.open(newline="", encoding="utf8"), delimiter=","
+    )
 
     vocab2count = Counter()
-    for row in csv:
-        vocab2count.update(row["sentence"].strip().split())
+    for no, row in enumerate(csv):
+        for word in row["sentence"].strip().split():
+            if word.startswith("["):
+                if not word.endswith("]"):
+                    print(
+                        f"found invalid token '{word}' in line {no + 2} of "
+                        f"'{options.metadata_csv}'!",
+                        file=sys.stderr,
+                    )
+                    return
+                word = (word,)
+            vocab2count.update(word)
 
     if options.pad in vocab2count:
         print(
-            f"--pad token '{options.pad}' found in {options.metadata_csv}!",
+            f"--pad token '{options.pad}' found in '{options.metadata_csv}'!",
+            file=sys.stderr,
+        )
+        return
+
+    if options.word_delimiter in vocab2count:
+        print(
+            f"--word-delimiter token '{options.word_delimiter}' found in "
+            f"'{options.metadata_csv}'!",
             file=sys.stderr,
         )
         return
 
     if options.unk in vocab2count:
         print(
-            f"--unk token '{options.unk}' found in {options.metadata_csv}. "
+            f"--unk token '{options.unk}' found in '{options.metadata_csv}'. "
             "This could be intentional",
             file=sys.stderr,
         )
@@ -48,10 +74,13 @@ def write_vocab(options: Options):
         vocab for (vocab, count) in vocab2count.items() if count > options.prune_count
     )
     del vocab2count
+
+    # always store last in fixed order
+    vocab.append(options.word_delimiter)
     vocab.append(options.unk)
     vocab.append(options.pad)
 
-    vocab_json = {options.iso: dict((k, v) for (v, k) in enumerate(vocab))}
+    vocab_json[options.iso] = dict((k, v) for (v, k) in enumerate(vocab))
     del vocab
 
-    dump(vocab_json, options.vocab_json.open("w"))
+    json.dump(vocab_json, options.vocab_json.open("w"))

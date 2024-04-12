@@ -12,17 +12,20 @@ conda env create -f environment.yaml
 
 ``` sh
 data=data
+exp=exp
 
 conda activate faetar-mms
 
+mkdir -p "$exp"
+
 # construct metadata.csv for each partition
-for d in "$data/"{train,dev,test}; do
-    find "$d" -name '*.txt' -printf '%p,' -exec cat {} \; |
-        sed 's/\.txt,//' |
+for d in "$data/"{dev,test,train}; do
+    find "$d" -name '*.txt' -printf '%P,' -exec cat {} \; |
+        sed 's/\.txt,/,/' |
         sort |
         cat <(echo "file,sentence") - > "$d/metadata.csv"
 done
 
-# construct vocabulary.json
-./run.py "$data/train/metadata.csv" vocab.json
+# construct vocab.json
+./run.py write-vocab "$data/train/metadata.csv" "$exp/vocab.json"
 ```

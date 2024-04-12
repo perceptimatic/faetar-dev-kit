@@ -52,10 +52,30 @@ class IntegerType(ArgparseType[int]):
     metavar = "INT"
 
     @staticmethod
-    def to(arg: str) -> str:
-        if WS & set(arg):
-            raise argparse.ArgumentTypeError(f"'{arg}' contains whitespace")
-        return arg
+    def to(arg: str) -> int:
+        return int(arg)
+
+
+class NonnegType(ArgparseType[int]):
+    metavar = "NONNEG"
+
+    @staticmethod
+    def to(arg: str) -> int:
+        int_ = int(arg)
+        if int_ < 0:
+            raise argparse.ArgumentTypeError(f"'{arg}' is not a non-negative integer")
+        return int_
+
+
+class NatType(ArgparseType[int]):
+    metavar = "NATG"
+
+    @staticmethod
+    def to(arg: str) -> int:
+        int_ = int(arg)
+        if int_ <= 0:
+            raise argparse.ArgumentTypeError(f"'{arg}' is not a natural number")
+        return int_
 
 
 class PathType(ArgparseType[pathlib.Path]):
@@ -118,25 +138,37 @@ class Options(object):
             *name_or_flags, metavar=metavar, default=default, type=type_, help=help
         )
 
-    cmd: Literal["write-vocab"] = "write-vocab"
-
+    # global kwargs
     unk: str = "[UNK]"
     pad: str = "[PAD]"
+    word_delimiter: str = "|"
+    sampling_rate: int = 16_000
+
+    # global args
+    cmd: Literal["write-vocab"] = "write-vocab"
+
+    # write-vocab kwargs
     iso: str = "fae"  # There's no Faetar ISO 639 code, but "fae" isn't mapped yet
     prune_count: int = 0
+    append: bool = False
+
+    # write-vocab args
     metadata_csv: pathlib.Path
     vocab_json: pathlib.Path
 
     @classmethod
     def add_vocab_args(cls, parser: argparse.ArgumentParser):
+
         cls._add_argument(
-            parser, "--unk", type=TokenType, help="out-of-vocabulary type (string)"
+            parser, "--prune-count", type=NonnegType, help="Prune tokens <= this count"
         )
-        cls._add_argument(
-            parser, "--pad", type=TokenType, help="padding/blank type (string)"
+        parser.add_argument(
+            "--append",
+            action="store_true",
+            default=False,
+            help="Add language to existing file",
         )
-        cls._add_argument(parser, "--iso", type=TokenType, help="iso 639 code")
-        cls._add_argument(parser, "--prune-count")
+
         cls._add_argument(
             parser,
             "metadata_csv",
@@ -153,6 +185,23 @@ class Options(object):
     @classmethod
     def parse_args(cls, args: Optional[Sequence[str]] = None, **kwargs):
         parser = argparse.ArgumentParser(**kwargs)
+
+        cls._add_argument(
+            parser, "--unk", type=TokenType, help="out-of-vocabulary type (string)"
+        )
+        cls._add_argument(
+            parser, "--pad", type=TokenType, help="padding/blank type (string)"
+        )
+        cls._add_argument(
+            parser,
+            "--word-delimiter",
+            type=TokenType,
+            help="word delimiter type (string)",
+        )
+        cls._add_argument(parser, "--iso", type=TokenType, help="iso 639 code")
+        cls._add_argument(
+            parser, "--sampling-rate", type=NatType, help="audio sampling rate"
+        )
 
         cmds = parser.add_subparsers(
             dest="cmd", required=True, description="Subcommand (see README)"
