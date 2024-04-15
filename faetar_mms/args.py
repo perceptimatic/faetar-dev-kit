@@ -148,7 +148,7 @@ class Options(object):
     cmd: Literal["write-vocab", "train", "decode"]
 
     # write-vocab kwargs
-    iso: str = "fae"  # There's no Faetar ISO 639 code, but "fae" isn't mapped yet
+    lang: str = "fae"  # There's no Faetar ISO 639 code, but "fae" isn't mapped yet
     prune_count: int = 0
     append: bool = False
 
@@ -158,6 +158,7 @@ class Options(object):
 
     # train kwargs
     pretrained_model_id: str = "facebook/mms-1b-all"
+    pretrained_model_lang: str = "ita"
 
     # train args
     # vocab_json
@@ -201,6 +202,9 @@ class Options(object):
         cls._add_argument(
             parser, "--pretrained-model-id", help="model to load from hub"
         )
+        cls._add_argument(
+            parser, "--pretrained-model-lang", help="iso 639 code of model from hub"
+        )
 
         cls._add_argument(
             parser, "vocab_json", type=ReadFileType, help="Path to vocab.json file"
@@ -213,9 +217,9 @@ class Options(object):
         )
         cls._add_argument(
             parser,
-            "ckpt_dir",
+            "model_dir",
             type=WriteDirType,
-            help="Path to model checkpoint dir (output)",
+            help="Path to model dir (output)",
         )
 
     @classmethod
@@ -223,9 +227,9 @@ class Options(object):
 
         cls._add_argument(
             parser,
-            "ckpt_dir",
+            "model_dir",
             type=ReadDirType,
-            help="Path to model checkpoint dir",
+            help="Path to model dir",
         )
         cls._add_argument(
             parser,
@@ -250,7 +254,7 @@ class Options(object):
             type=TokenType,
             help="word delimiter type (string)",
         )
-        cls._add_argument(parser, "--iso", type=TokenType, help="iso 639 code")
+        cls._add_argument(parser, "--lang", type=TokenType, help="iso 639 code")
         cls._add_argument(
             parser, "--sampling-rate", type=NatType, help="audio sampling rate"
         )

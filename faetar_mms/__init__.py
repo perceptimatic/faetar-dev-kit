@@ -10,7 +10,7 @@ def main(args: Optional[Sequence[str]] = None) -> None:
 
         write_vocab(options)
     elif options.cmd == "train":
-        from .asr import train
+        from .train import train
 
         train(options)
     else:

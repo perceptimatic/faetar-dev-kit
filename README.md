@@ -1,14 +1,15 @@
 # mms-faetar
 Baseline implementation for Faetar grand challenge
 
-Adapts the MMS fine-tuning [blog
+Adapts the excellent MMS fine-tuning [blog
 post](https://huggingface.co/blog/mms_adapters) by Patrick von Platen to the
 challenge. Uses Python scripts, not notebooks, because we're not savages.
 
-## Installation
+## Installation & activation
 
 ``` sh
 conda env create -f environment.yaml
+conda activate faetar-mms
 ```
 
 ## Running
@@ -17,9 +18,7 @@ conda env create -f environment.yaml
 data=data
 exp=exp
 
-conda activate faetar-mms
-
-mkdir -p "$exp/ckpts"
+mkdir -p "$exp"
 
 # construct metadata.csv for each partition
 for d in "$data/"{dev,test,train}; do
@@ -33,7 +32,10 @@ done
 ./run.py write-vocab "$data/train/metadata.csv" "$exp/vocab.json"
 
 # train the model
-./run.py train "$exp/vocab.json" "$data/"{train,dev} "$exp/ckpts"
+./run.py train "$exp/vocab.json" "$data/"{train,dev} "$exp"
+
+# greedy decoding
+
 ```
 
 ## License

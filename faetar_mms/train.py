@@ -12,15 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# much of this code was adapted from Patrick von Platen's
+#
+#   https://huggingface.co/blog/mms_adapters
+#
+# last accessed April 15th, 2024
+
 from typing import Literal, Union
 from dataclasses import dataclass
 
 import torch
 import numpy as np
 
+from safetensors.torch import save_file as safe_save_file
+from transformers.models.wav2vec2.modeling_wav2vec2 import WAV2VEC2_ADAPTER_SAFE_FILE
 from transformers import (
     Wav2Vec2CTCTokenizer,
-    Wav2Vec2FeatureExtractor,
     Wav2Vec2Processor,
     Wav2Vec2ForCTC,
     TrainingArguments,
@@ -32,24 +39,6 @@ from evaluate import load
 from .args import Options
 
 wer_metric = load("wer")
-
-
-def make_processor(options: Options) -> Wav2Vec2Processor:
-    tokenizer = Wav2Vec2CTCTokenizer(
-        options.vocab_json,
-        unk_token=options.unk,
-        pad_token=options.pad,
-        word_delimiter_token=options.word_delimiter,
-        target_lang=options.iso,
-    )
-    feature_extractor = Wav2Vec2FeatureExtractor(
-        feature_size=1,
-        sampling_rate=options.sampling_rate,
-        padding_value=0.0,
-        do_normalize=True,
-        return_attention_mask=True,
-    )
-    return Wav2Vec2Processor(feature_extractor, tokenizer)
 
 
 def load_partition(
@@ -67,6 +56,11 @@ def load_partition(
     ds = load_dataset("audiofolder", data_dir=data, split="all")
     ds = ds.cast_column("audio", Audio(sampling_rate=options.sampling_rate))
 
+    def filter_short(batch):
+        audio = batch["audio"]
+        duration = len(audio["array"]) / audio["sampling_rate"]
+        return duration > 0.5
+
     def prepare_dataset(batch):
         audio = batch["audio"]
 
@@ -78,14 +72,27 @@ def load_partition(
 
         batch["labels"] = processor(text=batch["sentence"]).input_ids
         return batch
-
+    
+    if part != "decode":
+        ds = ds.filter(filter_short)
     ds = ds.map(prepare_dataset, remove_columns=ds.column_names)
     return ds
 
 
-def load_model(options: Options, processor: Wav2Vec2Processor) -> Wav2Vec2ForCTC:
-    return Wav2Vec2ForCTC.from_pretrained(
+def load_model(options: Options) -> tuple[Wav2Vec2ForCTC, Wav2Vec2Processor]:
+    processor = Wav2Vec2Processor.from_pretrained(
         options.pretrained_model_id,
+    )
+    processor.tokenizer = Wav2Vec2CTCTokenizer(
+        options.vocab_json,
+        unk_token=options.unk,
+        pad_token=options.pad,
+        word_delimiter_token=options.word_delimiter,
+        target_lang=options.lang,
+    )
+    model = Wav2Vec2ForCTC.from_pretrained(
+        options.pretrained_model_id,
+        target_lang=options.pretrained_model_lang,
         attention_dropout=0.0,
         hidden_dropout=0.0,
         feat_proj_dropout=0.0,
@@ -95,6 +102,7 @@ def load_model(options: Options, processor: Wav2Vec2Processor) -> Wav2Vec2ForCTC
         vocab_size=len(processor.tokenizer),
         ignore_mismatched_sizes=True,
     )
+    return model, processor
 
 
 @dataclass
@@ -151,14 +159,13 @@ class TrainingRoutines:
 
 def train(options: Options):
 
-    processor = make_processor(options)
+    model, processor = load_model(options)
 
     dev = load_partition(options, "dev", processor)
     train = load_partition(options, "train", processor)
 
-    model = load_model(options, processor)
-
     model.init_adapter_layers()
+    model.freeze_base_model()
     adapter_weights = model._get_adapters()
     for param in adapter_weights.values():
         param.requires_grad = True
@@ -166,18 +173,17 @@ def train(options: Options):
     training_args = TrainingArguments(
         output_dir=options.ckpt_dir,
         group_by_length=True,
-        per_device_train_batch_size=32,
-        evaluation_strategy="steps",
-        num_train_epochs=4,
+        per_device_train_batch_size=8,
+        evaluation_strategy="epoch",
+        save_strategy="epoch",
+        num_train_epochs=1,
         gradient_checkpointing=True,
         fp16=True,
-        save_steps=200,
-        eval_steps=100,
-        logging_steps=100,
         learning_rate=1e-3,
         warmup_steps=100,
         save_total_limit=2,
         push_to_hub=False,
+        load_best_model_at_end=True,
     )
 
     training_routines = TrainingRoutines(processor, padding=True)
@@ -192,4 +198,12 @@ def train(options: Options):
         tokenizer=processor.feature_extractor,
     )
 
-    trainer.train()
+    try:
+        trainer.train(resume_from_checkpoint=True)
+    except ValueError:  # no checkpoint
+        trainer.train()
+
+    adapter_file = WAV2VEC2_ADAPTER_SAFE_FILE.format(model.target_lang)
+    adapter_file = options.ckpt_dir / adapter_file
+
+    safe_save_file(model._get_adapters(), adapter_file, metadata={"format": "pt"})
