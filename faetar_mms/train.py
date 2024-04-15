@@ -79,32 +79,6 @@ def load_partition(
     return ds
 
 
-def load_model(options: Options) -> tuple[Wav2Vec2ForCTC, Wav2Vec2Processor]:
-    processor = Wav2Vec2Processor.from_pretrained(
-        options.pretrained_model_id,
-    )
-    processor.tokenizer = Wav2Vec2CTCTokenizer(
-        options.vocab_json,
-        unk_token=options.unk,
-        pad_token=options.pad,
-        word_delimiter_token=options.word_delimiter,
-        target_lang=options.lang,
-    )
-    model = Wav2Vec2ForCTC.from_pretrained(
-        options.pretrained_model_id,
-        target_lang=options.pretrained_model_lang,
-        attention_dropout=0.0,
-        hidden_dropout=0.0,
-        feat_proj_dropout=0.0,
-        layerdrop=0.0,
-        ctc_loss_reduction="mean",
-        pad_token_id=processor.tokenizer.pad_token_id,
-        vocab_size=len(processor.tokenizer),
-        ignore_mismatched_sizes=True,
-    )
-    return model, processor
-
-
 @dataclass
 class TrainingRoutines:
 
@@ -159,7 +133,28 @@ class TrainingRoutines:
 
 def train(options: Options):
 
-    model, processor = load_model(options)
+    processor = Wav2Vec2Processor.from_pretrained(
+        options.pretrained_model_id,
+    )
+    processor.tokenizer = Wav2Vec2CTCTokenizer(
+        options.vocab_json,
+        unk_token=options.unk,
+        pad_token=options.pad,
+        word_delimiter_token=options.word_delimiter,
+        target_lang=options.lang,
+    )
+    model = Wav2Vec2ForCTC.from_pretrained(
+        options.pretrained_model_id,
+        target_lang=options.pretrained_model_lang,
+        attention_dropout=0.0,
+        hidden_dropout=0.0,
+        feat_proj_dropout=0.0,
+        layerdrop=0.0,
+        ctc_loss_reduction="mean",
+        pad_token_id=processor.tokenizer.pad_token_id,
+        vocab_size=len(processor.tokenizer),
+        ignore_mismatched_sizes=True,
+    )
 
     dev = load_partition(options, "dev", processor)
     train = load_partition(options, "train", processor)
@@ -171,7 +166,7 @@ def train(options: Options):
         param.requires_grad = True
 
     training_args = TrainingArguments(
-        output_dir=options.ckpt_dir,
+        output_dir=options.model_dir,
         group_by_length=True,
         per_device_train_batch_size=8,
         evaluation_strategy="epoch",
@@ -204,6 +199,6 @@ def train(options: Options):
         trainer.train()
 
     adapter_file = WAV2VEC2_ADAPTER_SAFE_FILE.format(model.target_lang)
-    adapter_file = options.ckpt_dir / adapter_file
+    adapter_file = options.model_dir / adapter_file
 
     safe_save_file(model._get_adapters(), adapter_file, metadata={"format": "pt"})
