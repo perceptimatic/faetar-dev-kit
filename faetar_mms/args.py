@@ -142,7 +142,6 @@ class Options(object):
     unk: str = "[UNK]"
     pad: str = "[PAD]"
     word_delimiter: str = "_"
-    sampling_rate: int = 16_000
 
     # global args
     cmd: Literal["write-vocab", "train", "decode"]
@@ -164,11 +163,12 @@ class Options(object):
     # vocab_json
     train_data: pathlib.Path
     dev_data: pathlib.Path
-    ckpt_dir: pathlib.Path
+    model_dir: pathlib.Path
 
     # decode args
-    # ckpt_dir
+    # model_dir
     decode_data: pathlib.Path
+    # metadata_csv
 
     @classmethod
     def add_write_vocab_args(cls, parser: argparse.ArgumentParser):
@@ -234,8 +234,14 @@ class Options(object):
         cls._add_argument(
             parser,
             "decode_data",
-            type=ReadDirType,
+            type=PathType,
             help="Path to AudioFolder to decode",
+        )
+        cls._add_argument(
+            parser,
+            "metadata_csv",
+            type=WriteFileType,
+            help="Path to hypothesis metadata.csv file (output)",
         )
 
     @classmethod
@@ -255,9 +261,6 @@ class Options(object):
             help="word delimiter type (string)",
         )
         cls._add_argument(parser, "--lang", type=TokenType, help="iso 639 code")
-        cls._add_argument(
-            parser, "--sampling-rate", type=NatType, help="audio sampling rate"
-        )
 
         cmds = parser.add_subparsers(
             dest="cmd", required=True, description="Subcommand (see README)"

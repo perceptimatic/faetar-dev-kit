@@ -18,7 +18,7 @@ conda activate faetar-mms
 data=data
 exp=exp
 
-mkdir -p "$exp"
+mkdir -p "$exp/decode"
 
 # construct metadata.csv for each partition
 for d in "$data/"{dev,test,train}; do
@@ -35,7 +35,7 @@ done
 ./run.py train "$exp/vocab.json" "$data/"{train,dev} "$exp"
 
 # greedy decoding
-
+./run.py decode "$exp" "$data/test" "$exp/decode/test.csv"
 ```
 
 ## License

@@ -18,7 +18,7 @@
 #
 # last accessed April 15th, 2024
 
-from typing import Literal, Union
+from typing import Union
 from dataclasses import dataclass
 
 import torch
@@ -33,50 +33,12 @@ from transformers import (
     TrainingArguments,
     Trainer,
 )
-from datasets import load_dataset, Audio, Dataset
 from evaluate import load
 
 from .args import Options
+from .data import load_partition
 
 wer_metric = load("wer")
-
-
-def load_partition(
-    options: Options,
-    part: Literal["train", "dev", "decode"],
-    processor: Wav2Vec2Processor,
-) -> Dataset:
-    if part == "train":
-        data = options.train_data
-    elif part == "dev":
-        data = options.dev_data
-    else:
-        data = options.decode_data
-
-    ds = load_dataset("audiofolder", data_dir=data, split="all")
-    ds = ds.cast_column("audio", Audio(sampling_rate=options.sampling_rate))
-
-    def filter_short(batch):
-        audio = batch["audio"]
-        duration = len(audio["array"]) / audio["sampling_rate"]
-        return duration > 0.5
-
-    def prepare_dataset(batch):
-        audio = batch["audio"]
-
-        # batched output is "un-batched"
-        batch["input_values"] = processor(
-            audio["array"], sampling_rate=audio["sampling_rate"]
-        ).input_values[0]
-        batch["input_length"] = len(batch["input_values"])
-
-        batch["labels"] = processor(text=batch["sentence"]).input_ids
-        return batch
-    
-    if part != "decode":
-        ds = ds.filter(filter_short)
-    ds = ds.map(prepare_dataset, remove_columns=ds.column_names)
-    return ds
 
 
 @dataclass
@@ -171,7 +133,7 @@ def train(options: Options):
         per_device_train_batch_size=8,
         evaluation_strategy="epoch",
         save_strategy="epoch",
-        num_train_epochs=1,
+        num_train_epochs=10,
         gradient_checkpointing=True,
         fp16=True,
         learning_rate=1e-3,
@@ -190,7 +152,8 @@ def train(options: Options):
         compute_metrics=training_routines.compute_metrics,
         train_dataset=train,
         eval_dataset=dev,
-        tokenizer=processor.feature_extractor,
+        # the encoder 'tokenizer', which is the feature extractor
+        tokenizer=processor.feature_extractor,   
     )
 
     try:
@@ -198,7 +161,10 @@ def train(options: Options):
     except ValueError:  # no checkpoint
         trainer.train()
 
-    adapter_file = WAV2VEC2_ADAPTER_SAFE_FILE.format(model.target_lang)
+    trainer.save_model(options.model_dir)
+    processor.tokenizer.save_pretrained(options.model_dir)
+
+    adapter_file = WAV2VEC2_ADAPTER_SAFE_FILE.format(options.lang)
     adapter_file = options.model_dir / adapter_file
 
     safe_save_file(model._get_adapters(), adapter_file, metadata={"format": "pt"})

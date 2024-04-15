@@ -80,7 +80,7 @@ def write_vocab(options: Options):
     vocab.append(options.unk)
     vocab.append(options.pad)
 
-    vocab_json[options.iso] = dict((k, v) for (v, k) in enumerate(vocab))
+    vocab_json[options.lang] = dict((k, v) for (v, k) in enumerate(vocab))
     del vocab
 
     json.dump(vocab_json, options.vocab_json.open("w"))

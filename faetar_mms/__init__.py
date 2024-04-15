@@ -13,5 +13,9 @@ def main(args: Optional[Sequence[str]] = None) -> None:
         from .train import train
 
         train(options)
+    elif options.cmd == "decode":
+        from .decode import decode
+
+        decode(options)
     else:
         raise NotImplementedError
