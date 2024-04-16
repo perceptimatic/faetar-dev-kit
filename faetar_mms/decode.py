@@ -21,30 +21,37 @@ from tqdm import tqdm
 from .args import Options
 from .data import load_partition
 
-SPACE_PATTERN = re.compile(r'\s+')
+SPACE_PATTERN = re.compile(r"\s+")
 
 
 def decode(options: Options):
-    
+
     if torch.cuda.is_available():
         device = torch.cuda.current_device()
     else:
-        device = 'cpu'
+        device = "cpu"
 
-    model = Wav2Vec2ForCTC.from_pretrained(options.model_dir, target_lang=options.lang).to(device)
-    processor = Wav2Vec2Processor.from_pretrained(options.model_dir, target_lang=options.lang)
+    model = Wav2Vec2ForCTC.from_pretrained(
+        options.model_dir, target_lang=options.lang
+    ).to(device)
+    processor = Wav2Vec2Processor.from_pretrained(
+        options.model_dir, target_lang=options.lang
+    )
 
     ds = load_partition(options, "decode", processor)
 
-    metadata_csv = options.metadata_csv.open("w")
+    metadata_csv = options.metadata_csv.open("w", encoding="utf8")
     metadata_csv.write("file_name,sentence\n")
 
     for elem in tqdm(ds):
-        input_dict = processor(elem["input_values"], sampling_rate=processor.feature_extractor.sampling_rate, return_tensors="pt", padding=True)
+        input_dict = processor(
+            elem["input_values"],
+            sampling_rate=processor.feature_extractor.sampling_rate,
+            return_tensors="pt",
+            padding=True,
+        )
         logits = model(input_dict.input_values.to(device)).logits
         greedy_path = logits.argmax(-1)[0]
         text = processor.decode(greedy_path)
-        text = SPACE_PATTERN.sub(' ', text)
+        text = SPACE_PATTERN.sub(" ", text)
         metadata_csv.write(f"{elem['file_name']},{text}\n")
-
-

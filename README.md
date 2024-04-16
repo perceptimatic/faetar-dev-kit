@@ -35,10 +35,10 @@ done
 ./run.py train "$exp/vocab.json" "$data/"{train,dev} "$exp"
 
 # greedy decoding
-./run.py decode "$exp" "$data/test" "$exp/decode/test.csv"
+./run.py decode "$exp" "$data/test" "$exp/decode/test_greedy.csv"
 
 # compute per
-./run.py evaluate "$data/test/metadata.csv" "$exp/decode/test.csv"
+./run.py evaluate "$data/test/metadata.csv" "$exp/decode/test_greedy.csv"
 ```
 
 ## License
