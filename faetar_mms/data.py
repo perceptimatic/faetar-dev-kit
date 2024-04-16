@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# much of this code was adapted from Patrick von Platen's
+# load_partition was adapted from Patrick von Platen's
 #
 #   https://huggingface.co/blog/mms_adapters
 #

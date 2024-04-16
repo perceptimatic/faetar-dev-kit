@@ -36,6 +36,9 @@ done
 
 # greedy decoding
 ./run.py decode "$exp" "$data/test" "$exp/decode/test.csv"
+
+# compute per
+./run.py evaluate "$data/test/metadata.csv" "$exp/decode/test.csv"
 ```
 
 ## License

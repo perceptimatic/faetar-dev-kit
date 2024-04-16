@@ -17,5 +17,9 @@ def main(args: Optional[Sequence[str]] = None) -> None:
         from .decode import decode
 
         decode(options)
+    elif options.cmd == "evaluate":
+        from .text import evaluate
+
+        evaluate(options)
     else:
         raise NotImplementedError

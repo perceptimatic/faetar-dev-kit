@@ -144,7 +144,7 @@ class Options(object):
     word_delimiter: str = "_"
 
     # global args
-    cmd: Literal["write-vocab", "train", "decode"]
+    cmd: Literal["write-vocab", "train", "decode", "evaluate"]
 
     # write-vocab kwargs
     lang: str = "fae"  # There's no Faetar ISO 639 code, but "fae" isn't mapped yet
@@ -169,6 +169,12 @@ class Options(object):
     # model_dir
     decode_data: pathlib.Path
     # metadata_csv
+
+    # evaluate kwargs
+    error_type: Literal["per", "cer", "wer"] = "per"
+
+    ref_csv: pathlib.Path
+    hyp_csv: pathlib.Path
 
     @classmethod
     def add_write_vocab_args(cls, parser: argparse.ArgumentParser):
@@ -245,6 +251,30 @@ class Options(object):
         )
 
     @classmethod
+    def add_evaluate_args(cls, parser: argparse.ArgumentParser):
+
+        parser.add_argument(
+            "--error-type",
+            choices=["per", "cer", "wer"],
+            default=cls.error_type,
+            help="What type of error to compute. PER = phone; CER = character; "
+            "WER = word",
+        )
+
+        cls._add_argument(
+            parser,
+            "ref_csv",
+            type=ReadFileType,
+            help="metadata.csv of reference transcriptions",
+        )
+        cls._add_argument(
+            parser,
+            "hyp_csv",
+            type=ReadFileType,
+            help="metadata.csv of hypothesis transcriptions",
+        )
+
+    @classmethod
     def parse_args(cls, args: Optional[Sequence[str]] = None, **kwargs):
         parser = argparse.ArgumentParser(**kwargs)
 
@@ -272,5 +302,6 @@ class Options(object):
         cls.add_decode_args(
             cmds.add_parser("decode", help="decode with fine-tuned mms model")
         )
+        cls.add_evaluate_args(cmds.add_parser("evaluate", help="Determine error rates"))
 
         return parser.parse_args(args, namespace=cls())

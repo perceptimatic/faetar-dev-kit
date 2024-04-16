@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+import torch
 
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 from tqdm import tqdm
@@ -25,16 +26,22 @@ SPACE_PATTERN = re.compile(r'\s+')
 
 def decode(options: Options):
     
-    model = Wav2Vec2ForCTC.from_pretrained(options.model_dir, target_lang=options.lang)
+    if torch.cuda.is_available():
+        device = torch.cuda.current_device()
+    else:
+        device = 'cpu'
+
+    model = Wav2Vec2ForCTC.from_pretrained(options.model_dir, target_lang=options.lang).to(device)
     processor = Wav2Vec2Processor.from_pretrained(options.model_dir, target_lang=options.lang)
 
     ds = load_partition(options, "decode", processor)
 
     metadata_csv = options.metadata_csv.open("w")
+    metadata_csv.write("file_name,sentence\n")
 
-    for elem in ds:
+    for elem in tqdm(ds):
         input_dict = processor(elem["input_values"], sampling_rate=processor.feature_extractor.sampling_rate, return_tensors="pt", padding=True)
-        logits = model(input_dict.input_values).logits
+        logits = model(input_dict.input_values.to(device)).logits
         greedy_path = logits.argmax(-1)[0]
         text = processor.decode(greedy_path)
         text = SPACE_PATTERN.sub(' ', text)
