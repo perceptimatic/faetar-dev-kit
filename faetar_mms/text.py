@@ -142,6 +142,6 @@ def evaluate(options: Options):
         )
 
     if options.error_type == "wer":
-        print(f"{jiwer.wer(refs, hyps):.02%}")
+        print(f"{jiwer.wer(refs, hyps):.01%}")
     else:
-        print(f"{jiwer.cer(refs, hyps):.02%}")
+        print(f"{jiwer.cer(refs, hyps):.01%}")
