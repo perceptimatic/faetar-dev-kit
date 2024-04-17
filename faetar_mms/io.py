@@ -26,6 +26,27 @@ import jiwer
 from .args import Options
 
 
+def compile_metadata(options: Options):
+
+    fp = (options.data / "metadata.csv").open("w")
+    fp.write("file_name,sentence\n")
+
+    for wav in sorted(options.data.glob("*.wav")):
+        entries = [wav.name]
+        if not options.no_sentence:
+            txt = options.data / (wav.stem + ".txt")
+            if not txt.is_file():
+                print(
+                    f"'{wav}' exists, but '{txt}' does not! If you don't want "
+                    "transcripts, add the --no-sentence flag",
+                    file=sys.stderr,
+                )
+                return
+            entries.append(txt.read_text().strip())
+        fp.write(",".join(entries))
+        fp.write("\n")
+
+
 def write_vocab(options: Options):
 
     if options.append:
@@ -95,6 +116,7 @@ def evaluate(options: Options):
     # long = compile(r"(?<=(?P<phn>.))\1+")  # replace consecutive phones with ː
     spaces = compile(r"\s+")  # remove duplicate spaces
 
+    # XXX(sdrobert): keep up-to-date with run.sh:filter(...)
     def _filter(transcript: str) -> str:
 
         transcript = special.sub(" ", transcript)

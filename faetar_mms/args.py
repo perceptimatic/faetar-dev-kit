@@ -145,6 +145,7 @@ class Options(object):
 
     # global args
     cmd: Literal[
+        "compile-metadata",
         "write-vocab",
         "train",
         "decode",
@@ -152,6 +153,12 @@ class Options(object):
         "metadata-to-trn",
         "vocab-to-token2id",
     ]
+
+    # compile-metadata kwargs
+    no_sentence: bool = False
+
+    # compile-metadata args
+    data: pathlib.Path
 
     # write-vocab kwargs
     lang: str = "fae"  # There's no Faetar ISO 639 code, but "fae" isn't mapped yet
@@ -167,7 +174,7 @@ class Options(object):
     pretrained_model_lang: str = "ita"
 
     # train args
-    # vocab_json
+    # vocab_json: pathlib.Path
     train_data: pathlib.Path
     dev_data: pathlib.Path
     model_dir: pathlib.Path
@@ -176,9 +183,9 @@ class Options(object):
     logits_dir: Optional[pathlib.Path] = None
 
     # decode args
-    # model_dir
-    decode_data: pathlib.Path
-    # metadata_csv
+    # model_dir: pathlib.Path
+    # data: pathlib.Path
+    # metadata_csv: pathlib.Path
 
     # evaluate kwargs
     error_type: Literal["per", "cer", "wer"] = "per"
@@ -188,15 +195,28 @@ class Options(object):
     hyp_csv: pathlib.Path
 
     # metadata2trn args
-    # metadata_csv
+    # metadata_csv: pathlib.Path
     trn: pathlib.Path
 
     # vocab2token2id args
-    # vocab_json
+    # vocab_json: pathlib.Path
     token2id: pathlib.Path
 
     @classmethod
-    def add_write_vocab_args(cls, parser: argparse.ArgumentParser):
+    def _add_compile_metadata_args(cls, parser: argparse.ArgumentParser):
+
+        parser.add_argument(
+            "--no-sentence",
+            action="store_true",
+            help="do not add 'sentence' field to metadata.csv",
+        )
+
+        cls._add_argument(
+            parser, "data", type=ReadDirType, help="AudioFolder directory"
+        )
+
+    @classmethod
+    def _add_write_vocab_args(cls, parser: argparse.ArgumentParser):
 
         cls._add_argument(
             parser, "--prune-count", type=NonnegType, help="Prune tokens <= this count"
@@ -222,7 +242,7 @@ class Options(object):
         )
 
     @classmethod
-    def add_train_args(cls, parser: argparse.ArgumentParser):
+    def _add_train_args(cls, parser: argparse.ArgumentParser):
 
         cls._add_argument(
             parser, "--pretrained-model-id", help="model to load from hub"
@@ -248,7 +268,7 @@ class Options(object):
         )
 
     @classmethod
-    def add_decode_args(cls, parser: argparse.ArgumentParser):
+    def _add_decode_args(cls, parser: argparse.ArgumentParser):
 
         cls._add_argument(
             parser,
@@ -258,7 +278,7 @@ class Options(object):
         )
         cls._add_argument(
             parser,
-            "decode_data",
+            "data",
             type=ReadDirType,
             help="Path to AudioFolder to decode",
         )
@@ -276,7 +296,7 @@ class Options(object):
         )
 
     @classmethod
-    def add_evaluate_args(cls, parser: argparse.ArgumentParser):
+    def _add_evaluate_args(cls, parser: argparse.ArgumentParser):
 
         parser.add_argument(
             "--error-type",
@@ -300,7 +320,7 @@ class Options(object):
         )
 
     @classmethod
-    def add_metadata_to_trn_args(cls, parser: argparse.ArgumentParser):
+    def _add_metadata_to_trn_args(cls, parser: argparse.ArgumentParser):
 
         cls._add_argument(
             parser, "metadata_csv", type=ReadFileType, help="metadata.csv file"
@@ -308,7 +328,7 @@ class Options(object):
         cls._add_argument(parser, "trn", type=WriteFileType, help="trn file (output)")
 
     @classmethod
-    def add_vocab_to_token2id_args(cls, parser: argparse.ArgumentParser):
+    def _add_vocab_to_token2id_args(cls, parser: argparse.ArgumentParser):
 
         cls._add_argument(
             parser, "vocab_json", type=ReadFileType, help="vocab.json file"
@@ -336,23 +356,40 @@ class Options(object):
         cls._add_argument(parser, "--lang", type=TokenType, help="iso 639 code")
 
         cmds = parser.add_subparsers(
-            dest="cmd", required=True, description="Subcommand (see README)"
+            title="steps",
+            dest="cmd",
+            required=True,
+            metavar="STEP",
         )
-        cls.add_write_vocab_args(
+
+        cls._add_compile_metadata_args(
+            cmds.add_parser(
+                "compile-metadata", help="Write metadata.csv file in AudioFolder"
+            )
+        )
+
+        cls._add_write_vocab_args(
             cmds.add_parser("write-vocab", help="Write vocab.json file")
         )
-        cls.add_train_args(cmds.add_parser("train", help="fine-tune an mms model"))
-        cls.add_decode_args(
+
+        cls._add_train_args(cmds.add_parser("train", help="fine-tune an mms model"))
+
+        cls._add_decode_args(
             cmds.add_parser("decode", help="decode with fine-tuned mms model")
         )
-        cls.add_evaluate_args(cmds.add_parser("evaluate", help="Determine error rates"))
-        cls.add_vocab_to_token2id_args(
+
+        cls._add_evaluate_args(
+            cmds.add_parser("evaluate", help="Determine error rates")
+        )
+
+        cls._add_vocab_to_token2id_args(
             cmds.add_parser(
                 "vocab-to-token2id",
                 help="Convert lang in vocab.json to a token2id file",
             )
         )
-        cls.add_metadata_to_trn_args(
+
+        cls._add_metadata_to_trn_args(
             cmds.add_parser(
                 "metadata-to-trn",
                 help="Convert metadata.csv to a trn transcription file",

@@ -26,6 +26,7 @@ from transformers import Wav2Vec2Processor
 
 from .args import Options
 
+
 def load_partition(
     options: Options,
     part: Literal["train", "dev", "decode"],
@@ -36,11 +37,13 @@ def load_partition(
     elif part == "dev":
         data = options.dev_data
     else:
-        data = options.decode_data
+        data = options.data
     data = data.absolute()
 
     ds = load_dataset("audiofolder", data_dir=data, split="all")
-    ds = ds.cast_column("audio", Audio(sampling_rate=processor.feature_extractor.sampling_rate))
+    ds = ds.cast_column(
+        "audio", Audio(sampling_rate=processor.feature_extractor.sampling_rate)
+    )
 
     def filter_short(batch):
         audio = batch["audio"]
@@ -58,9 +61,10 @@ def load_partition(
         ).input_values[0]
         batch["input_length"] = len(batch["input_values"])
 
-        batch["labels"] = processor(text=batch["sentence"]).input_ids
+        if "sentence" in batch:
+            batch["labels"] = processor(text=batch["sentence"]).input_ids
         return batch
-    
+
     if part != "decode":
         ds = ds.filter(filter_short)
     ds = ds.map(prepare_dataset, remove_columns=ds.column_names)
