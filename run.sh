@@ -36,6 +36,7 @@ beta=1
 lm_ord=1
 training_kwargs=conf/training_kwargs.json
 wav2vec2_kwargs=conf/wav2vec2_kwargs.json
+bootstrap_samples=0
 help="Train and evaluate the faetar-mms baseline
 
 Options
@@ -48,9 +49,10 @@ Options
     -w NAT      pyctcdecode's beam width (default: $width)
     -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
     -b NAT      pyctcdecode's beta, inverted (default: $beta)
-    -l NAT      n-gram LM order. 1 is no LM (default: $lm_ord)"
+    -l NAT      n-gram LM order. 1 is no LM (default: $lm_ord)
+    -n NNINT    Bootstrap samples. 0 is no bootstrap (default: $bootstrap_samples)"
 
-while getopts "hoe:d:c:C:a:b:l:" name; do
+while getopts "hoe:d:c:C:a:b:l:n:" name; do
     case $name in
         h)
             echo "$usage"
@@ -73,6 +75,8 @@ while getopts "hoe:d:c:C:a:b:l:" name; do
             beta="$OPTARG";;
         l)
             lm_ord="$OPTARG";;
+        n)
+            bootstrap_samples="$OPTARG";;
         *)
             echo -e "$usage"
             exit 1;;
@@ -107,6 +111,10 @@ if ! [ "$beta" -gt 0 ] 2> /dev/null; then
 fi
 if ! [ "$lm_ord" -gt 0 ] 2> /dev/null; then
     echo -e "$lm_ord is not a natural number! set -l appropriately!"
+    exit 1
+fi
+if ! [ "$bootstrap_samples" -ge 0 ] 2> /dev/null; then
+    echo -e "$bootstrap_samples is not a non-negative int! set -n appropriately!"
     exit 1
 fi
 
@@ -162,6 +170,12 @@ for d in "$data/"{train,dev,test}; do
         filter "$d/ref.trn"
         if $only; then exit 0; fi
     fi
+    if [ $bootstrap_samples > 0 ] && ! [ -f "$d/utt2rec" ]; then
+        echo "Writing $d/utt2rec"
+        sed 's/.*(\(.*\))$/\1/; s/\(.*\)_\(.*\)$/\1_\2 \2/' "$d/ref.trn" \
+            > "$d/utt2rec"
+        if $only; then exit 0; fi
+    fi
 done
 
 if [ "$lm_ord" = 1 ]; then
@@ -198,14 +212,18 @@ for part in dev test; do
     fi
 done
 
-echo "==========================================="
 for er in filt char phone; do
+    echo "===================================================================="
+    echo "                       ERROR TYPE: $er                              "
+    echo "===================================================================="
     echo ""
     for part in dev test; do
-        ./prep/error-rates-from-trn.py --suppress-warning \
+        ./prep/error-rates-from-trn.py \
+            --suppress-warning --ignore-empty-refs --differences \
+            --bootstrap-samples "$bootstrap_samples" \
+            --bootstrap-utt2grp "$data/$part/utt2rec" \
             "$data/$part/ref.trn_$er" \
             "$exp/decode/${part}_"*".trn_$er"
         echo ""
     done
-    echo "==========================================="
-done | tee RESULTS 
+done

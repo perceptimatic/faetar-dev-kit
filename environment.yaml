@@ -12,13 +12,14 @@ dependencies:
   - evaluate
   - pytorch-cuda
   - pytorch
-  - jiwer
+  - jiwer>=3
   - transformers
   - accelerate
   - pyctcdecode
-  - pydrobert-pytorch
   - diskcache
   - pip:
-    - git+https://github.com/sdrobert/kenlm
+    - "git+https://github.com/sdrobert/pydrobert-pytorch.git"
+    - "git+https://github.com/sdrobert/kenlm"
+    - confidence_intervals
 variables:
   PYTHONUTF8: 1
