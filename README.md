@@ -14,7 +14,10 @@ conda activate faetar-mms
 
 ## Running (basic)
 
-The following sequence of commands fine-tunes a 
+The following sequence of commands fine-tunes MMS on the data in `data/train`
+and `data/dev`, greedily decodes the data in `data/test`, and compares the
+resulting hypothesis transcripts to the reference transcripts in `data/test`,
+printing a Phone Error Rate (PER).
 
 ``` sh
 # assuming data is located in the data/ dir

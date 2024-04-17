@@ -15,6 +15,7 @@
 # limitations under the License.
 
 export PYTHONUTF8=1
+[ -f "path.sh" ] && . "path.sh"
 
 # XXX(sdrobert): keep up-to-date with faetar_mms/io.py:evaluate(...)
 filter() {
@@ -33,6 +34,8 @@ width=100
 alpha_inv=1
 beta=1
 lm_ord=1
+training_kwargs=conf/training_kwargs.json
+wav2vec2_kwargs=conf/wav2vec2_kwargs.json
 help="Train and evaluate the faetar-mms baseline
 
 Options
@@ -40,12 +43,14 @@ Options
     -o          Run only the next step of the script
     -e DIR      The experiment directory (default: '$exp')
     -d DIR      The data directory (default: '$data')
+    -c FILE     Path to TrainingArguments JSON keyword args (default: '$training_kwargs')
+    -C FILE     Path to Wav2Vec2Config JSON keyword args (default: '$wav2vec2_kwargs')
     -w NAT      pyctcdecode's beam width (default: $width)
     -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
     -b NAT      pyctcdecode's beta, inverted (default: $beta)
     -l NAT      n-gram LM order. 1 is no LM (default: $lm_ord)"
 
-while getopts "hoe:d:a:b:l:" name; do
+while getopts "hoe:d:c:C:a:b:l:" name; do
     case $name in
         h)
             echo "$usage"
@@ -58,6 +63,10 @@ while getopts "hoe:d:a:b:l:" name; do
             exp="$OPTARG";;
         d)
             data="$OPTARG";;
+        c)
+            training_kwargs="$OPTARG";;
+        C)
+            wav2vec2_kwargs="$OPTARG";;
         a)
             alpha_inv="$OPTARG";;
         b)
@@ -76,6 +85,14 @@ for d in "$data/"{train,dev,test}; do
         exit 1
     fi
 done
+if ! [ -f "$training_kwargs" ]; then
+    echo -e "'$training_kwargs' is not a file! Set -c appropriately!"
+    exit 1
+fi
+if ! [ -f "$wav2vec2_kwargs" ]; then
+    echo -e "'$wav2vec2_kwargs' is not a file! Set -C appropriately!"
+    exit 1
+fi
 if ! mkdir -p "$exp" 2> /dev/null; then
     echo -e "Could not create '$exp'! set -e appropriately!"
     exit 1
@@ -92,8 +109,6 @@ if ! [ "$lm_ord" -gt 0 ] 2> /dev/null; then
     echo -e "$lm_ord is not a natural number! set -l appropriately!"
     exit 1
 fi
-
-[ -f "path.sh" ] && . "path.sh"
 
 set -e
 

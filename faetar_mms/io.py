@@ -41,10 +41,12 @@ def compile_metadata(options: Options):
                     "transcripts, add the --no-sentence flag",
                     file=sys.stderr,
                 )
-                return
+                return 1
             entries.append(txt.read_text().strip())
         fp.write(",".join(entries))
         fp.write("\n")
+
+    return 0
 
 
 def write_vocab(options: Options):
@@ -67,7 +69,7 @@ def write_vocab(options: Options):
                         f"'{options.metadata_csv}'!",
                         file=sys.stderr,
                     )
-                    return
+                    return 1
                 word = (word,)
             vocab2count.update(word)
 
@@ -76,7 +78,7 @@ def write_vocab(options: Options):
             f"--pad token '{options.pad}' found in '{options.metadata_csv}'!",
             file=sys.stderr,
         )
-        return
+        return 1
 
     if options.word_delimiter in vocab2count:
         print(
@@ -84,7 +86,7 @@ def write_vocab(options: Options):
             f"'{options.metadata_csv}'!",
             file=sys.stderr,
         )
-        return
+        return 1
 
     if options.unk in vocab2count:
         print(
@@ -108,6 +110,8 @@ def write_vocab(options: Options):
     del vocab
 
     json.dump(vocab_json, options.vocab_json.open("w"))
+
+    return 0
 
 
 def evaluate(options: Options):
@@ -141,7 +145,7 @@ def evaluate(options: Options):
                 f"file '{file_name}' row could not be found in '{options.hyp_csv}'!",
                 file=sys.stderr,
             )
-            return
+            return 1
         hyp = _filter(hyp_dict.pop(file_name))
         if ref:
             refs.append(ref)
@@ -163,6 +167,8 @@ def evaluate(options: Options):
     else:
         print(f"{jiwer.cer(refs, hyps):.01%}")
 
+    return 0
+
 
 def metadata_to_trn(options: Options):
 
@@ -176,6 +182,8 @@ def metadata_to_trn(options: Options):
     for utt, transcript in trn:
         fp.write(f"{transcript} ({utt})\n")
 
+    return 0
+
 
 def vocab_to_token2id(options: Options):
 
@@ -184,3 +192,5 @@ def vocab_to_token2id(options: Options):
     fp = options.token2id.open("w")
     for token, id_ in sorted(token2id.items()):
         fp.write(f"{token} {id_}\n")
+
+    return 0

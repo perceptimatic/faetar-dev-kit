@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import os
 import pathlib
 import string
 
@@ -172,6 +173,8 @@ class Options(object):
     # train kwargs
     pretrained_model_id: str = "facebook/mms-1b-all"
     pretrained_model_lang: str = "ita"
+    training_kwargs_json: os.PathLike = "conf/training_kwargs.json"
+    wav2vec2_kwargs_json: os.PathLike = "conf/wav2vec2_kwargs.json"
 
     # train args
     # vocab_json: pathlib.Path
@@ -249,6 +252,26 @@ class Options(object):
         )
         cls._add_argument(
             parser, "--pretrained-model-lang", help="iso 639 code of model from hub"
+        )
+        cls._add_argument(
+            parser,
+            "--wav2vec2-kwargs-json",
+            type=ReadFileType,
+            help="Path to JSON containing transformers.Wav2Vec2Config keyword args. "
+            "\nWARNING: Values will clobber whatever is in the pretrained model. Make "
+            "sure you're not overwriting anything important."
+            "\nSee "
+            "https://huggingface.co/docs/transformers/main/en/model_doc/wav2vec2#transformers.Wav2Vec2Config"
+            " for list of keyword arguments",
+        )
+        cls._add_argument(
+            parser,
+            "--training-kwargs-json",
+            type=ReadFileType,
+            help="Path to JSON containing transformers.TrainingArguments keyword args. "
+            "\nSee "
+            "https://huggingface.co/docs/transformers/main_classes/trainer#transformers.TrainingArguments"
+            " for list of keyword arguments",
         )
 
         cls._add_argument(

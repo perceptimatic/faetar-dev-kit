@@ -18,7 +18,7 @@ from typing import Optional, Sequence
 from .args import Options
 
 
-def main(args: Optional[Sequence[str]] = None) -> None:
+def main(args: Optional[Sequence[str]] = None):
     options = Options.parse_args(
         args, description="Run a step of the faetar-mms recipe"
     )
@@ -26,30 +26,30 @@ def main(args: Optional[Sequence[str]] = None) -> None:
     if options.cmd == "compile-metadata":
         from .io import compile_metadata
 
-        compile_metadata(options)
+        return compile_metadata(options)
     elif options.cmd == "write-vocab":
         from .io import write_vocab
 
-        write_vocab(options)
+        return write_vocab(options)
     elif options.cmd == "train":
         from .train import train
 
-        train(options)
+        return train(options)
     elif options.cmd == "decode":
         from .decode import decode
 
-        decode(options)
+        return decode(options)
     elif options.cmd == "evaluate":
         from .io import evaluate
 
-        evaluate(options)
+        return evaluate(options)
     elif options.cmd == "metadata-to-trn":
         from .io import metadata_to_trn
 
-        metadata_to_trn(options)
+        return metadata_to_trn(options)
     elif options.cmd == "vocab-to-token2id":
         from .io import vocab_to_token2id
 
-        vocab_to_token2id(options)
+        return vocab_to_token2id(options)
     else:
         raise NotImplementedError

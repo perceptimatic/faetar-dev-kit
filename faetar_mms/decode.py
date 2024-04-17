@@ -62,3 +62,5 @@ def decode(options: Options):
         text = processor.decode(greedy_path)
         text = SPACE_PATTERN.sub(" ", text)
         metadata_csv.write(f"{elem['file_name']},{text}\n")
+
+    return 0

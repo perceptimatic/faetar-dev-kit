@@ -18,7 +18,10 @@
 #
 # last accessed April 15th, 2024
 
-from typing import Union
+import sys
+import json
+
+from typing import Any, Union
 from dataclasses import dataclass
 
 import torch
@@ -105,17 +108,31 @@ def train(options: Options):
         word_delimiter_token=options.word_delimiter,
         target_lang=options.lang,
     )
+
+    with open(options.wav2vec2_kwargs_json) as fp:
+        wav2vec2_kwargs: dict[str, Any] = json.load(fp)
+
+    for name, expected in (
+        ("pad_token_id", processor.tokenizer.pad_token_id),
+        ("vocab_size", len(processor.tokenizer)),
+        ("target_lang", options.pretrained_model_lang),
+    ):
+        if name not in wav2vec2_kwargs:
+            wav2vec2_kwargs[name] = expected
+        elif wav2vec2_kwargs[name] != expected:
+            print(
+                f"'{options.wav2vec2_kwargs_json}' contains the entry "
+                f"'{name}' = {wav2vec2_kwargs[name]}, but we expected "
+                f"{expected} based on '{options.vocab_json}'. "
+                "You probably shouldn't specify this entry in the first place",
+                file=sys.stderr,
+            )
+            return 1
+    if "ignore_mismatched_sizes" not in wav2vec2_kwargs:
+        wav2vec2_kwargs["ignore_mismatched_sizes"] = True
+
     model = Wav2Vec2ForCTC.from_pretrained(
-        options.pretrained_model_id,
-        target_lang=options.pretrained_model_lang,
-        attention_dropout=0.0,
-        hidden_dropout=0.0,
-        feat_proj_dropout=0.0,
-        layerdrop=0.0,
-        ctc_loss_reduction="mean",
-        pad_token_id=processor.tokenizer.pad_token_id,
-        vocab_size=len(processor.tokenizer),
-        ignore_mismatched_sizes=True,
+        options.pretrained_model_id, **wav2vec2_kwargs
     )
 
     dev = load_partition(options, "dev", processor)
@@ -127,21 +144,10 @@ def train(options: Options):
     for param in adapter_weights.values():
         param.requires_grad = True
 
-    training_args = TrainingArguments(
-        output_dir=options.model_dir,
-        group_by_length=True,
-        per_device_train_batch_size=8,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        num_train_epochs=10,
-        gradient_checkpointing=True,
-        fp16=True,
-        learning_rate=1e-3,
-        warmup_steps=100,
-        save_total_limit=2,
-        push_to_hub=False,
-        load_best_model_at_end=True,
-    )
+    with open(options.training_kwargs_json) as fp:
+        training_kwargs = json.load(fp)
+
+    training_args = TrainingArguments(output_dir=options.model_dir, **training_kwargs)
 
     training_routines = TrainingRoutines(processor, padding=True)
 
@@ -153,7 +159,7 @@ def train(options: Options):
         train_dataset=train,
         eval_dataset=dev,
         # the encoder 'tokenizer', which is the feature extractor
-        tokenizer=processor.feature_extractor,   
+        tokenizer=processor.feature_extractor,
     )
 
     try:
@@ -168,3 +174,5 @@ def train(options: Options):
     adapter_file = options.model_dir / adapter_file
 
     safe_save_file(model._get_adapters(), adapter_file, metadata={"format": "pt"})
+
+    return 0
