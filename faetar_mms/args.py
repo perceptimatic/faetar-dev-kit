@@ -144,7 +144,14 @@ class Options(object):
     word_delimiter: str = "_"
 
     # global args
-    cmd: Literal["write-vocab", "train", "decode", "evaluate"]
+    cmd: Literal[
+        "write-vocab",
+        "train",
+        "decode",
+        "evaluate",
+        "metadata-to-trn",
+        "vocab-to-token2id",
+    ]
 
     # write-vocab kwargs
     lang: str = "fae"  # There's no Faetar ISO 639 code, but "fae" isn't mapped yet
@@ -165,6 +172,9 @@ class Options(object):
     dev_data: pathlib.Path
     model_dir: pathlib.Path
 
+    # decode kwargs
+    logits_dir: Optional[pathlib.Path] = None
+
     # decode args
     # model_dir
     decode_data: pathlib.Path
@@ -173,8 +183,17 @@ class Options(object):
     # evaluate kwargs
     error_type: Literal["per", "cer", "wer"] = "per"
 
+    # evaluate args
     ref_csv: pathlib.Path
     hyp_csv: pathlib.Path
+
+    # metadata2trn args
+    # metadata_csv
+    trn: pathlib.Path
+
+    # vocab2token2id args
+    # vocab_json
+    token2id: pathlib.Path
 
     @classmethod
     def add_write_vocab_args(cls, parser: argparse.ArgumentParser):
@@ -240,8 +259,14 @@ class Options(object):
         cls._add_argument(
             parser,
             "decode_data",
-            type=PathType,
+            type=ReadDirType,
             help="Path to AudioFolder to decode",
+        )
+        cls._add_argument(
+            parser,
+            "--logits-dir",
+            type=WriteDirType,
+            help="Path to dump logits to (if specified; output)",
         )
         cls._add_argument(
             parser,
@@ -275,6 +300,24 @@ class Options(object):
         )
 
     @classmethod
+    def add_metadata_to_trn_args(cls, parser: argparse.ArgumentParser):
+
+        cls._add_argument(
+            parser, "metadata_csv", type=ReadFileType, help="metadata.csv file"
+        )
+        cls._add_argument(parser, "trn", type=WriteFileType, help="trn file (output)")
+
+    @classmethod
+    def add_vocab_to_token2id_args(cls, parser: argparse.ArgumentParser):
+
+        cls._add_argument(
+            parser, "vocab_json", type=ReadFileType, help="vocab.json file"
+        )
+        cls._add_argument(
+            parser, "token2id", type=WriteFileType, help="token2id file (output)"
+        )
+
+    @classmethod
     def parse_args(cls, args: Optional[Sequence[str]] = None, **kwargs):
         parser = argparse.ArgumentParser(**kwargs)
 
@@ -303,5 +346,17 @@ class Options(object):
             cmds.add_parser("decode", help="decode with fine-tuned mms model")
         )
         cls.add_evaluate_args(cmds.add_parser("evaluate", help="Determine error rates"))
+        cls.add_vocab_to_token2id_args(
+            cmds.add_parser(
+                "vocab-to-token2id",
+                help="Convert lang in vocab.json to a token2id file",
+            )
+        )
+        cls.add_metadata_to_trn_args(
+            cmds.add_parser(
+                "metadata-to-trn",
+                help="Convert metadata.csv to a trn transcription file",
+            )
+        )
 
         return parser.parse_args(args, namespace=cls())

@@ -21,5 +21,13 @@ def main(args: Optional[Sequence[str]] = None) -> None:
         from .text import evaluate
 
         evaluate(options)
+    elif options.cmd == "metadata-to-trn":
+        from .text import metadata_to_trn
+
+        metadata_to_trn(options)
+    elif options.cmd == "vocab-to-token2id":
+        from .text import vocab_to_token2id
+
+        vocab_to_token2id(options)
     else:
         raise NotImplementedError

@@ -4,6 +4,7 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
+  - sdrobert
   - nodefaults
 dependencies:
   - datasets
@@ -15,3 +16,7 @@ dependencies:
   - transformers
   - accelerate
   - pyctcdecode
+  - pydrobert-pytorch
+  - diskcache
+  - pip:
+    - git+https://github.com/sdrobert/kenlm

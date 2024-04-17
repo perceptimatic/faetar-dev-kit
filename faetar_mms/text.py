@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
 import json
 
@@ -33,9 +34,7 @@ def write_vocab(options: Options):
     else:
         vocab_json = dict()
 
-    csv = DictReader(
-        options.metadata_csv.open(newline="", encoding="utf8"), delimiter=","
-    )
+    csv = DictReader(options.metadata_csv.open(newline=""), delimiter=",")
 
     vocab2count = Counter()
     for no, row in enumerate(csv):
@@ -93,13 +92,13 @@ def write_vocab(options: Options):
 def evaluate(options: Options):
 
     special = compile(r"(:?\[[^]]+\])|(:?<[^>]+>)\s+")  # remove special tokens
-    long = compile(r"(?<=(?P<phn>.))\1+")  # replace consecutive phones with ː
+    # long = compile(r"(?<=(?P<phn>.))\1+")  # replace consecutive phones with ː
     spaces = compile(r"\s+")  # remove duplicate spaces
 
     def _filter(transcript: str) -> str:
 
         transcript = special.sub(" ", transcript)
-        transcript = long.sub("\u02d0", transcript)
+        # transcript = long.sub("\u02d0", transcript)
 
         if options.error_type == "per":
             transcript = transcript.replace(" ", "")
@@ -107,14 +106,10 @@ def evaluate(options: Options):
             transcript = spaces.sub(" ", transcript)
         return transcript
 
-    ref_dict = DictReader(
-        options.ref_csv.open(newline="", encoding="utf8"), delimiter=","
-    )
+    ref_dict = DictReader(options.ref_csv.open(newline=""), delimiter=",")
     hyp_dict = dict(
         (row["file_name"], row["sentence"])
-        for row in DictReader(
-            options.hyp_csv.open(newline="", encoding="utf8"), delimiter=","
-        )
+        for row in DictReader(options.hyp_csv.open(newline=""), delimiter=",")
     )
     refs, hyps = [], []
     for row in ref_dict:
@@ -145,3 +140,25 @@ def evaluate(options: Options):
         print(f"{jiwer.wer(refs, hyps):.01%}")
     else:
         print(f"{jiwer.cer(refs, hyps):.01%}")
+
+
+def metadata_to_trn(options: Options):
+
+    trn = [
+        (os.path.splitext(os.path.basename(row["file_name"]))[0], row["sentence"])
+        for row in DictReader(options.metadata_csv.open(newline=""), delimiter=",")
+    ]
+    trn.sort()
+
+    fp = options.trn.open("w")
+    for utt, transcript in trn:
+        fp.write(f"{transcript} ({utt})\n")
+
+
+def vocab_to_token2id(options: Options):
+
+    token2id = json.load(options.vocab_json.open())[options.lang]
+
+    fp = options.token2id.open("w")
+    for token, id_ in sorted(token2id.items()):
+        fp.write(f"{token} {id_}\n")

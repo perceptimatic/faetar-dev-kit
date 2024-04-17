@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import re
 import torch
 
@@ -40,8 +41,11 @@ def decode(options: Options):
 
     ds = load_partition(options, "decode", processor)
 
-    metadata_csv = options.metadata_csv.open("w", encoding="utf8")
+    metadata_csv = options.metadata_csv.open("w")
     metadata_csv.write("file_name,sentence\n")
+
+    if options.logits_dir is not None:
+        options.logits_dir.mkdir(exist_ok=True)
 
     for elem in tqdm(ds):
         input_dict = processor(
@@ -50,7 +54,10 @@ def decode(options: Options):
             return_tensors="pt",
             padding=True,
         )
-        logits = model(input_dict.input_values.to(device)).logits
+        logits = model(input_dict.input_values.to(device)).logits.cpu()
+        if options.logits_dir is not None:
+            pt = options.logits_dir / (os.path.splitext(elem["file_name"])[0] + ".pt")
+            torch.save(logits[0, :, : processor.tokenizer.vocab_size], pt)
         greedy_path = logits.argmax(-1)[0]
         text = processor.decode(greedy_path)
         text = SPACE_PATTERN.sub(" ", text)
