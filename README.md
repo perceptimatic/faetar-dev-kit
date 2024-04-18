@@ -1,9 +1,7 @@
-# mms-faetar
-Baseline implementation for Faetar grand challenge
+# faetar-dev-kit
+Data processing and baselines for the 2024 Faetar Grand Challenge
 
-Adapts the excellent MMS fine-tuning [blog
-post](https://huggingface.co/blog/mms_adapters) by Patrick von Platen to the
-challenge. Uses Python scripts, not notebooks, because we're not savages.
+
 
 ## Installation & activation
 
@@ -46,7 +44,11 @@ done
 It is possible to do prefix search decoding with language model fusion. See
 [run.sh](./run.sh) for more details.
 
-## License
+## License and attribution
+
+The MMS baseline adapts the excellent MMS fine-tuning [blog
+post](https://huggingface.co/blog/mms_adapters) by Patrick von Platen to the
+challenge. We use Python scripts, not notebooks, because we're not savages.
 
 This code is licensed with [Apache 2.0](./LICENSE). I could not see any license
 information in the blog post.
