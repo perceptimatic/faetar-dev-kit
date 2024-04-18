@@ -123,6 +123,7 @@ set -e
 if [ ! -f "prep/ngram_lm.py" ]; then
     echo "Initializing Git submodules"
     git submodule init
+    git submodule update
 fi
 
 for d in "$data/"{train,dev,test}; do
@@ -148,6 +149,7 @@ fi
 for part in dev test; do
     if  ! [ -f "$exp/decode/${part}_greedy.trn_phone" ]; then
         echo "Greedy decoding and dumping logits of '$data/$part'"
+        mkdir -p "$exp/decode/logits/$part"
         ./step.py decode \
                 --logits-dir "$exp/decode/logits/$part" \
                 "$exp" "$data/$part" "$exp/decode/${part}_greedy.csv"
@@ -163,6 +165,7 @@ if ! [ -f "$exp/token2id" ]; then
     if $only; then exit 0; fi
 fi
 
+
 for d in "$data/"{train,dev,test}; do
     if ! [ -f "$d/ref.trn_phone" ]; then
         echo "Writing trn files in '$d'"
@@ -170,7 +173,7 @@ for d in "$data/"{train,dev,test}; do
         filter "$d/ref.trn"
         if $only; then exit 0; fi
     fi
-    if [ $bootstrap_samples > 0 ] && ! [ -f "$d/utt2rec" ]; then
+    if [ $bootstrap_samples -gt 0 ] && ! [ -f "$d/utt2rec" ]; then
         echo "Writing $d/utt2rec"
         sed 's/.*(\(.*\))$/\1/; s/\(.*\)_\(.*\)$/\1_\2 \2/' "$d/ref.trn" \
             > "$d/utt2rec"
