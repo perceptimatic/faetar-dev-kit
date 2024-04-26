@@ -25,10 +25,22 @@ function split_text () {
 }
 
 bench_dir="$1"
+conf_dir="conf_lstm"
 out_dir="data_lstm"
 partitions=(train test dev)
 
 mkdir -p "$out_dir"/prep/
+mkdir -p "$conf_dir"
+
+if [ ! -f "$conf_dir/model.yaml" ]; then
+  python3 prep/asr-baseline.py --print-model-yaml "$conf_dir/model.yaml"
+fi
+if [ ! -f "$conf_dir/data.yaml" ]; then
+  python3 prep/asr-baseline.py train --print-data-yaml "$conf_dir/data.yaml"
+fi
+if [ ! -f "$conf_dir/training.yaml" ]; then
+  python3 prep/asr-baseline.py train --print-training-yaml "$conf_dir/training.yaml"
+fi
 
 for partition in "${partitions[@]}"; do
     :> "$out_dir"/prep/"wav_${partition}.scp"
