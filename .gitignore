@@ -169,3 +169,5 @@ conf_lstm
 conf_lstm/
 data_lstm
 data_lstm/
+exp_lstm
+exp_lstm/
