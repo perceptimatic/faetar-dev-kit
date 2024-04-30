@@ -1,3 +1,6 @@
 [submodule "prep"]
 	path = prep
 	url = https://github.com/sdrobert/pytorch-database-prep
+[submodule "espnet"]
+	path = espnet
+	url = https://github.com/espnet/espnet

@@ -1,4 +1,4 @@
-name: mms-faetar
+name: faetar-dev-kit
 channels:
   - huggingface
   - pytorch
@@ -10,13 +10,14 @@ dependencies:
   - datasets
   - librosa
   - evaluate
-  - pytorch-cuda
-  - pytorch
+  - pytorch-cuda=11.8
+  - pytorch=2.3.*
   - jiwer>=3
   - transformers
   - accelerate
   - pyctcdecode
   - diskcache
+  - espnet
   - pip:
     - "git+https://github.com/sdrobert/pydrobert-pytorch.git"
     - "git+https://github.com/sdrobert/kenlm"

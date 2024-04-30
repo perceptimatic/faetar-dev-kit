@@ -165,3 +165,5 @@ data
 exp
 data/
 exp/
+.micromamba
+.micromamba/

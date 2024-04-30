@@ -1,52 +1,32 @@
 # faetar-dev-kit
 Data processing and baselines for the 2024 Faetar Grand Challenge
 
-
-
-## Installation & activation
+## Installation
 
 ``` sh
+# installs ALL dependencies in a conda environment and activates it
+# (if you're just training or decoding with one baseline, you probably
+# don't need all of them)
 conda env create -f environment.yaml
-conda activate faetar-mms
+conda activate faetar-dev-kit
 ```
 
-## Running (basic)
-
-The following sequence of commands fine-tunes MMS on the data in `data/train`
-and `data/dev`, greedily decodes the data in `data/test`, and compares the
-resulting hypothesis transcripts to the reference transcripts in `data/test`,
-printing a Phone Error Rate (PER).
+## ASR baselines
 
 ``` sh
-# assuming data is located in the data/ dir
-mkdir -p exp/decode
+# assumes data/ is populated with {train,dev,test,...} partitions and
+# exp/ contains all artifacts (checkpoints, hypothesis transcriptions, etc.)
 
-# construct metadata.csv for each partition
-for d in data/{dev,test,train}; do
-    ./step.py compile-metadata $d
-done
+# Train and greedily decode MMS-LSAH
+./run_mms_lsah.sh  # -h flag for options
 
-# construct vocab.json
-./step.py write-vocab data/train/metadata.csv exp/vocab.json
-
-# train the model
-./step.py train exp/vocab.json data/{train,dev} exp
-
-# greedy decoding
-./step.py decode exp data/test exp/decode/test_greedy.csv
-
-# compute per
-./step.py evaluate data/test/metadata.csv exp/decode/test_greedy.csv
+# compute the PER, differences, and CIs of all models
+./evaluate_asr.sh -n 1000  # -h flag for options
 ```
-
-## Running (advanced)
-
-It is possible to do prefix search decoding with language model fusion. See
-[run.sh](./run.sh) for more details.
 
 ## License and attribution
 
-The MMS baseline adapts the excellent MMS fine-tuning [blog
+The *MMS-LSAH* baseline adapts the excellent MMS fine-tuning [blog
 post](https://huggingface.co/blog/mms_adapters) by Patrick von Platen to the
 challenge. We use Python scripts, not notebooks, because we're not savages.
 

@@ -173,8 +173,8 @@ class Options(object):
     # train kwargs
     pretrained_model_id: str = "facebook/mms-1b-all"
     pretrained_model_lang: str = "ita"
-    training_kwargs_json: os.PathLike = "conf/training_kwargs.json"
-    wav2vec2_kwargs_json: os.PathLike = "conf/wav2vec2_kwargs.json"
+    training_kwargs_json: os.PathLike = "conf/mms-lsah/training_kwargs.json"
+    wav2vec2_kwargs_json: os.PathLike = "conf/mms-lsah/wav2vec2_kwargs.json"
 
     # train args
     # vocab_json: pathlib.Path
