@@ -94,6 +94,12 @@ filter() {
     mv "${fn}_per"{_,}
 }
 
+if [ ! -f "prep/ngram_lm.py" ]; then
+    echo "Initializing Git submodule"
+    git submodule update --init --remote prep
+    if $only; then exit 0; fi
+fi
+
 if ! [ -f "$data/ref.trn" ]; then
     echo "Writing '$data/ref.trn'"
     find "$data/" -maxdepth 1 -name '*.txt' | 

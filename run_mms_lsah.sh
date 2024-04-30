@@ -17,15 +17,6 @@
 export PYTHONUTF8=1
 [ -f "path.sh" ] && . "path.sh"
 
-# XXX(sdrobert): keep up-to-date with faetar_mms/io.py:evaluate(...)
-filter() {
-    fn="$1"
-    sed 's/\[[^]][^]]*\] //g; s/<[^>][^>]*> //g;' "$fn" > "${fn}_filt"
-    ./prep/word2subword.py "$fn"{_filt,_char}
-    sed 's/_ //g' "${fn}_char" > "${fn}_phone"
-}
-
-
 usage="Usage: $0 [-h] [-o] [-e DIR] [-d DIR] [-w NAT] [-a NAT] [-b NAT] [-l NNINT]"
 only=false
 exp=exp/mms-lsah
@@ -152,6 +143,13 @@ if [ "$lm_ord" = 0 ]; then
         fi
     done
 else
+
+    if [ ! -f "prep/ngram_lm.py" ]; then
+        echo "Initializing Git submodule"
+        git submodule update --init --remote prep
+        if $only; then exit 0; fi
+    fi
+
     for part in dev test; do
         if  ! [ -f "$exp/decode/logits/$part/.done" ]; then
             echo "Dumping logits of '$data/$part'"

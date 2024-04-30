@@ -18,6 +18,7 @@ dependencies:
   - pyctcdecode
   - diskcache
   - espnet
+  - perl
   - pip:
     - "git+https://github.com/sdrobert/pydrobert-pytorch.git"
     - "git+https://github.com/sdrobert/kenlm"
