@@ -19,14 +19,14 @@ export PYTHONUTF8=1
 
 usage="Usage: $0 [-h] [-o] [-e DIR] [-d DIR] [-w NAT] [-a NAT] [-b NAT] [-l NNINT]"
 only=false
-exp=exp/mms-lsah
+exp=exp/mms_lsah
 data=data
 width=100
 alpha_inv=1
 beta=1
 lm_ord=0
-training_kwargs=conf/mms-lsah/training_kwargs.json
-wav2vec2_kwargs=conf/mms-lsah/wav2vec2_kwargs.json
+training_kwargs=conf/mms_lsah/training_kwargs.json
+wav2vec2_kwargs=conf/mms_lsah/wav2vec2_kwargs.json
 help="Train and decode with the mms-lsah baseline
 
 Options
