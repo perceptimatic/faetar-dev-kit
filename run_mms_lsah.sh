@@ -28,14 +28,14 @@ filter() {
 
 usage="Usage: $0 [-h] [-o] [-e DIR] [-d DIR] [-w NAT] [-a NAT] [-b NAT] [-l NNINT]"
 only=false
-exp=exp
-data=data
+exp=exp/mms_lsah
+data=data/mms_lsah
 width=100
 alpha_inv=1
 beta=1
 lm_ord=1
-training_kwargs=conf/training_kwargs.json
-wav2vec2_kwargs=conf/wav2vec2_kwargs.json
+training_kwargs=conf/mms_lsah/training_kwargs.json
+wav2vec2_kwargs=conf/mms_lsah/wav2vec2_kwargs.json
 bootstrap_samples=0
 help="Train and evaluate the faetar-mms baseline
 
