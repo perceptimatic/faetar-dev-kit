@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
 
+# Copyright 2024 Michael Ong
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 if [ $# -ne 1 ]; then
     echo "Usage: $0 bench_corpus_dir"
     exit 1
@@ -25,22 +40,10 @@ function split_text () {
 }
 
 bench_dir="$1"
-conf_dir="conf_lstm"
-out_dir="data_lstm"
+out_dir="data/lstm"
 partitions=(train test dev)
 
 mkdir -p "$out_dir"/prep/
-mkdir -p "$conf_dir"
-
-if [ ! -f "$conf_dir/model.yaml" ]; then
-  python3 prep/asr-baseline.py --print-model-yaml "$conf_dir/model.yaml"
-fi
-if [ ! -f "$conf_dir/data.yaml" ]; then
-  python3 prep/asr-baseline.py train --print-data-yaml "$conf_dir/data.yaml"
-fi
-if [ ! -f "$conf_dir/training.yaml" ]; then
-  python3 prep/asr-baseline.py train --print-training-yaml "$conf_dir/training.yaml"
-fi
 
 for partition in "${partitions[@]}"; do
     :> "$out_dir"/prep/"wav_${partition}.scp"
