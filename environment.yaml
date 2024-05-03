@@ -4,19 +4,23 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
-  - sdrobert
   - nodefaults
 dependencies:
+  - accelerate
+  - cmake
+  - cuda-nvcc
+  - cxx-compiler
   - datasets
-  - librosa
+  - diskcache
   - evaluate
+  - jiwer>=3
+  - librosa
+  - make
+  - pyctcdecode
   - pytorch-cuda=11.8
   - pytorch=2.3.*
-  - jiwer>=3
+  - sox
   - transformers
-  - accelerate
-  - pyctcdecode
-  - diskcache
   - pip:
     - "git+https://github.com/sdrobert/pydrobert-pytorch.git"
     - "git+https://github.com/sdrobert/kenlm"

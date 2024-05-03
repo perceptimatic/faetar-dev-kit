@@ -76,6 +76,10 @@ for d in "$data/"{train,dev,test}; do
         exit 1
     fi
 done
+if ! mkdir -p "$exp" 2> /dev/null; then
+    echo -e "Could not create '$exp'! set -e appropriately!"
+    exit 1
+fi
 if ! [ -f "$training_kwargs" ]; then
     echo -e "'$training_kwargs' is not a file! Set -c appropriately!"
     exit 1
@@ -84,16 +88,12 @@ if ! [ -f "$wav2vec2_kwargs" ]; then
     echo -e "'$wav2vec2_kwargs' is not a file! Set -C appropriately!"
     exit 1
 fi
-if ! mkdir -p "$exp" 2> /dev/null; then
-    echo -e "Could not create '$exp'! set -e appropriately!"
-    exit 1
-fi
 if ! [ "$alpha_inv" -gt 0 ] 2> /dev/null; then
     echo -e "$alpha_inv is not a natural number! set -a appropriately!"
     exit 1
 fi
 if ! [ "$beta" -gt 0 ] 2> /dev/null; then
-    echo -e "$beta_inv is not a natural number! set -b appropriately!"
+    echo -e "$beta is not a natural number! set -b appropriately!"
     exit 1
 fi
 if ! [ "$lm_ord" -ge 0 ] 2> /dev/null; then

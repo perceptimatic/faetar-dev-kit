@@ -75,7 +75,7 @@ if ! [ "$bootstrap_samples" -ge 0 ] 2> /dev/null; then
 fi
 
 part="$(basename "$data")"
-hyps=( $(find "$exp" -name "${part}_*.trn") )
+hyps=( $(find "$exp/" -name "${part}_*.trn") )
 if [ "${#hyps[@]}" = 0 ]; then
     echo -e "'$exp' contains no trn files! Set -e appropriately!"
     exit 1
