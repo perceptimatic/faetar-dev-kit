@@ -18,10 +18,13 @@ conda activate faetar-dev-kit
 # exp/ contains all artifacts (checkpoints, hypothesis transcriptions, etc.)
 
 # Train and greedily decode MMS-LSAH
+# successfully trained on a single T4 core
 ./run_mms_lsah.sh  # -h flag for options
 
 # Train and greedily decode MMS-10min or MMS-1h
-# (makes a new virtualenv; won't work on Git Bash)
+# makes a new virtualenv; won't work on Git Bash
+#  (faetar-dev-kit should contain necessary build tools)
+# successfully trained on a single A40 core
 ./run_ml_superb.sh  # 10min
 ./run_ml_superb.sh -e exp/mms-1h -p 1h # 1h
 

@@ -20,11 +20,11 @@ export PYTHONUTF8=1
 usage="Usage: $0 [-h] [-o] [-g] [-e DIR] [-d DIR] [-p {10min,1h}] [-c FILE] [-C FILE]"
 only=false
 gpu_inference=false
-train_jobs=32
-inference_jobs=32
+feat_jobs=1 # can quickly OOM if you do more than one for MMS
+inference_jobs=1  # can quickly OOM if you do more than one for MMS
 data=data
 dump=dump
-exp=exp
+exp=exp/mms-10min
 train_part=10min
 asr_config=conf/ml_superb/tuning/train_asr_mms_single.yaml
 inference_config=conf/ml_superb/decode_asr.yaml
@@ -41,7 +41,7 @@ Options
                 The amount of data to train with (default: '$train_part')
     -c FILE     Path to asr config YAML (default: '$asr_config')
     -C FILE     Path to inference config YAML (default: '$inference_config')
-    -j NAT      Number of training jobs (default: $train_jobs)
+    -j NAT      Number of feature creation jobs (default: $feat_jobs)
     -J NAT      Number of inference jobs (default: $inference_jobs)"
 
 while getopts "hoge:d:D:p:c:C:j:J:" name; do
@@ -68,7 +68,7 @@ while getopts "hoge:d:D:p:c:C:j:J:" name; do
         C)
             inference_config="$OPTARG";;
         j)
-            train_jobs="$OPTARG";;
+            feat_jobs="$OPTARG";;
         J)
             inference_jobs="$OPTARG";;
         *)
@@ -103,8 +103,8 @@ if ! [ -f "$inference_config" ]; then
     echo -e "'$inference_config' is not a file! Set -C appropriately!"
     exit 1
 fi
-if ! [ "$train_jobs" -gt 0 ] 2> /dev/null; then
-    echo -e "$train_jobs is not a natural number! set -j appropriately!"
+if ! [ "$feat_jobs" -gt 0 ] 2> /dev/null; then
+    echo -e "$feat_jobs is not a natural number! set -j appropriately!"
     exit 1
 fi
 if ! [ "$inference_jobs" -ge 0 ] 2> /dev/null; then
@@ -177,7 +177,7 @@ for stage in $(seq 1 12); do
         ./asr.sh \
             --ngpu 1 \
             --stage $stage --stop_stage $stage \
-            --nj $train_jobs --inference-nj $inference_jobs \
+            --nj $feat_jobs --inference-nj $inference_jobs \
             --gpu_inference $gpu_inference \
             --lang fae \
             --inference_asr_model "valid.loss.ave.pth" \
