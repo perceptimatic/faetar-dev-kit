@@ -64,7 +64,7 @@ while getopts "hoe:b:d:c:C:a:B:l:" name; do
             wav2vec2_kwargs="$OPTARG";;
         a)
             alpha_inv="$OPTARG";;
-        b)
+        B)
             beta="$OPTARG";;
         l)
             lm_ord="$OPTARG";;
