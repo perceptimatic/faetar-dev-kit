@@ -74,12 +74,16 @@ while getopts "hoe:b:d:c:C:a:B:l:" name; do
     esac
 done
 shift $(($OPTIND - 1))
-for d in "$data/"{train,dev,test}; do
-    if [ ! -d "$d" ]; then
-        echo -e "'$d' is not a directory! set -d appropriately!"
+for part in train dev test; do
+    if [ ! -d "$bench/$part" ]; then
+        echo -e "'$bench/$part' is not a directory! set -b appropriately!"
         exit 1
     fi
 done
+if ! mkdir -p "$data" 2> /dev/null; then
+    echo -e "Could not create '$data'! set -d appropriately!"
+    exit 1
+fi
 if ! mkdir -p "$exp" 2> /dev/null; then
     echo -e "Could not create '$exp'! set -e appropriately!"
     exit 1
@@ -97,7 +101,7 @@ if ! [ "$alpha_inv" -gt 0 ] 2> /dev/null; then
     exit 1
 fi
 if ! [ "$beta" -gt 0 ] 2> /dev/null; then
-    echo -e "$beta is not a natural number! set -b appropriately!"
+    echo -e "$beta is not a natural number! set -B appropriately!"
     exit 1
 fi
 if ! [ "$lm_ord" -ge 0 ] 2> /dev/null; then
@@ -112,10 +116,11 @@ if [ ! -f "prep/ngram_lm.py" ]; then
     git submodule update --init --remote prep
 fi
 
-for d in "$data/"{train,dev,test}; do
-    if ! [ -f "$d/metadata.csv" ]; then
-        echo "Creating metadata.csv in '$d'"
-        ./mms.py compile-metadata "$d"
+for part in train dev test; do
+    if ! [ -f "$data/$part/metadata.csv" ]; then
+        echo "Creating metadata.csv in '$data/$part'"
+        mkdir -p "$data/$part"
+        ./mms.py compile-metadata "$bench/$part" "$data/$part"
         if $only; then exit 0; fi
     fi
 done
@@ -128,17 +133,17 @@ fi
 
 if ! [ -f "$exp/config.json" ]; then
     echo "Training model and writing to '$exp'"
-    ./mms.py train "$exp/vocab.json" "$data/"{train,dev} "$exp"
+    ./mms.py train "$exp/vocab.json" "$bench/"{train,dev} "$exp"
     if $only; then exit 0; fi
 fi
 
 if [ "$lm_ord" = 0 ]; then
     for part in dev test; do
         if  ! [ -f "$exp/decode/${part}_greedy.trn" ]; then
-            echo "Greedily decoding '$data/$part'"
+            echo "Greedily decoding '$bench/$part'"
             mkdir -p "$exp/decode"
             ./mms.py decode \
-                "$exp" "$data/$part" "$exp/decode/${part}_greedy.csv_"
+                "$exp" "$bench/$part" "$exp/decode/${part}_greedy.csv_"
             mv "$exp/decode/${part}_greedy.csv"{_,}
             ./mms.py metadata-to-trn \
                 "$exp/decode/${part}_greedy."{csv,trn_}
@@ -155,11 +160,10 @@ else
 
     for part in dev test; do
         if  ! [ -f "$exp/decode/logits/$part/.done" ]; then
-            echo "Dumping logits of '$data/$part'"
+            echo "Dumping logits of '$bench/$part'"
             mkdir -p "$exp/decode/logits/$part"
-            ./mms.py decode \
-                --dump-logits "$exp/decode/logits/$part" \
-                "$exp" "$data/$part" "/dev/null"
+            ./mms.py decode --logits-dir "$exp/decode/logits/$part" \
+                "$exp" "$bench/$part" "/dev/null"
             touch "$exp/decode/logits/$part/.done"
             if $only; then exit 0; fi
         fi
@@ -190,7 +194,7 @@ else
     fi
 
     for part in dev test; do
-        if ! [ -f "$exp/decode/${part}_${name}.trn_phone" ]; then
+        if ! [ -f "$exp/decode/${part}_${name}.trn" ]; then
             echo "Decoding $part"
             ./prep/logits-to-trn-via-pyctcdecode.py \
                 --char "${lm_args[@]}" \
@@ -204,3 +208,11 @@ else
         fi
     done
 fi
+
+for part in dev test; do
+    ./prep/error-rates-from-trn.py \
+        --suppress-warning --ignore-empty-refs --differences \
+        "$data/$part/trn" \
+        "$exp/decode/${part}_"*".trn"
+    echo ""
+done
