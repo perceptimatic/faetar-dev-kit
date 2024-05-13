@@ -159,6 +159,7 @@ class Options(object):
     no_sentence: bool = False
 
     # compile-metadata args
+    bench: pathlib.Path
     data: pathlib.Path
 
     # write-vocab kwargs
@@ -215,7 +216,12 @@ class Options(object):
         )
 
         cls._add_argument(
-            parser, "data", type=ReadDirType, help="AudioFolder directory"
+            parser, "bench", type=ReadDirType, help="AudioFolder directory"
+        )
+
+
+        cls._add_argument(
+            parser, "data", type=ReadDirType, help="work directory"
         )
 
     @classmethod

@@ -17,8 +17,9 @@
 export PYTHONUTF8=1
 [ -f "path.sh" ] && . "path.sh"
 
-usage="Usage: $0 [-h] [-o] [-e DIR] [-d DIR] [-r {wer|cer|per}] [-n NNINT]"
+usage="Usage: $0 [-h] [-o] [-e DIR] [-m DIR] [-d DIR] [-p DIR] [-r {wer|cer|per}] [-n NNINT]"
 only=false
+bench=
 data=data
 model=
 part=test

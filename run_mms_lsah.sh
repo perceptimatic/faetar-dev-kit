@@ -17,10 +17,11 @@
 export PYTHONUTF8=1
 [ -f "path.sh" ] && . "path.sh"
 
-usage="Usage: $0 [-h] [-o] [-e DIR] [-d DIR] [-w NAT] [-a NAT] [-b NAT] [-l NNINT]"
+usage="Usage: $0 [-h] [-o] [-e DIR] [-b DIR] [-d DIR] [-w NAT] [-a NAT] [-B NAT] [-l NNINT]"
 only=false
 exp=exp/mms_lsah
-data=data
+bench=
+data=data/mms_lsah
 width=100
 alpha_inv=1
 beta=1
@@ -33,15 +34,16 @@ Options
     -h          Display this help message and exit
     -o          Run only the next step of the script
     -e DIR      The experiment directory (default: '$exp')
-    -d DIR      The data directory (default: '$data')
+    -b DIR      The bench corpus directory
+    -d DIR      The working data directory (default: '$data')
     -c FILE     Path to TrainingArguments JSON keyword args (default: '$training_kwargs')
     -C FILE     Path to Wav2Vec2Config JSON keyword args (default: '$wav2vec2_kwargs')
     -w NAT      pyctcdecode's beam width (default: $width)
     -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
-    -b NAT      pyctcdecode's beta, inverted (default: $beta)
+    -B NAT      pyctcdecode's beta, inverted (default: $beta)
     -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)"
 
-while getopts "hoe:d:c:C:a:b:l:" name; do
+while getopts "hoe::b:d::c::C::a::B::l::" name; do
     case $name in
         h)
             echo "$usage"
@@ -52,6 +54,8 @@ while getopts "hoe:d:c:C:a:b:l:" name; do
             only=true;;
         e)
             exp="$OPTARG";;
+        b)
+            bench="$OPTARG";;
         d)
             data="$OPTARG";;
         c)
@@ -60,7 +64,7 @@ while getopts "hoe:d:c:C:a:b:l:" name; do
             wav2vec2_kwargs="$OPTARG";;
         a)
             alpha_inv="$OPTARG";;
-        b)
+        B)
             beta="$OPTARG";;
         l)
             lm_ord="$OPTARG";;
@@ -69,13 +73,17 @@ while getopts "hoe:d:c:C:a:b:l:" name; do
             exit 1;;
     esac
 done
-shift $(($OPTIND - 1))
-for d in "$data/"{train,dev,test}; do
-    if [ ! -d "$d" ]; then
-        echo -e "'$d' is not a directory! set -d appropriately!"
+shift "$((OPTIND - 1))"
+for part in train dev test; do
+    if [ ! -d "$bench/$part" ]; then
+        echo -e "'$bench/$part' is not a directory! set -b appropriately!"
         exit 1
     fi
 done
+if ! mkdir -p "$data" 2> /dev/null; then
+    echo -e "Could not create '$data'! set -d appropriately!"
+    exit 1
+fi
 if ! mkdir -p "$exp" 2> /dev/null; then
     echo -e "Could not create '$exp'! set -e appropriately!"
     exit 1
@@ -93,7 +101,7 @@ if ! [ "$alpha_inv" -gt 0 ] 2> /dev/null; then
     exit 1
 fi
 if ! [ "$beta" -gt 0 ] 2> /dev/null; then
-    echo -e "$beta is not a natural number! set -b appropriately!"
+    echo -e "$beta is not a natural number! set -B appropriately!"
     exit 1
 fi
 if ! [ "$lm_ord" -ge 0 ] 2> /dev/null; then
@@ -108,10 +116,11 @@ if [ ! -f "prep/ngram_lm.py" ]; then
     git submodule update --init --remote prep
 fi
 
-for d in "$data/"{train,dev,test}; do
-    if ! [ -f "$d/metadata.csv" ]; then
-        echo "Creating metadata.csv in '$d'"
-        ./mms.py compile-metadata "$d"
+for part in train dev test; do
+    if ! [ -f "$data/$part/metadata.csv" ]; then
+        echo "Creating metadata.csv in '$data/$part'"
+        mkdir -p "$data/$part"
+        ./mms.py compile-metadata "$bench/$part" "$data/$part"
         if $only; then exit 0; fi
     fi
 done
@@ -122,19 +131,39 @@ if ! [ -f "$exp/vocab.json" ]; then
     if $only; then exit 0; fi
 fi
 
-if ! [ -f "$exp/config.json" ]; then
-    echo "Training model and writing to '$exp'"
-    ./mms.py train "$exp/vocab.json" "$data/"{train,dev} "$exp"
+if ! [ -f "$exp/token2id" ]; then
+    echo "Creating $exp/token2id"
+    cut -d ',' -f 2 "$data/train/metadata.csv" |
+    awk \
+    'BEGIN {
+        FS = " ";
+        OFS = " ";
+    }
+
+    NR != 1 {
+        gsub(/\[fp\]|d[zʒ]ː|tʃː|d[zʒ]|tʃ|\Sː|\S/, "& ");
+        gsub(/ +/, " ");
+        print $0;
+    }' |
+    tr ' ' $'\n' |
+    sort -u |
+    awk 'NF {print $0,NR-1}' > "$exp/token2id"
     if $only; then exit 0; fi
 fi
 
-if [ "$lm_ord" = 0 ]; then
+if ! [ -f "$exp/config.json" ]; then
+    echo "Training model and writing to '$exp'"
+    ./mms.py train "$exp/vocab.json" "$bench/"{train,dev} "$exp"
+    if $only; then exit 0; fi
+fi
+
+if [ "$lm_ord" -eq 0 ]; then
     for part in dev test; do
-        if  ! [ -f "$exp/decode/${part}_greedy.trn" ]; then
-            echo "Greedily decoding '$data/$part'"
+        if ! [ -f "$exp/decode/${part}_greedy.trn" ]; then
+            echo "Greedily decoding '$bench/$part'"
             mkdir -p "$exp/decode"
             ./mms.py decode \
-                "$exp" "$data/$part" "$exp/decode/${part}_greedy.csv_"
+                "$exp" "$bench/$part" "$exp/decode/${part}_greedy.csv_"
             mv "$exp/decode/${part}_greedy.csv"{_,}
             ./mms.py metadata-to-trn \
                 "$exp/decode/${part}_greedy."{csv,trn_}
@@ -143,7 +172,6 @@ if [ "$lm_ord" = 0 ]; then
         fi
     done
 else
-
     if [ ! -f "prep/ngram_lm.py" ]; then
         echo "Initializing Git submodule"
         git submodule update --init --remote prep
@@ -152,11 +180,11 @@ else
 
     for part in dev test; do
         if  ! [ -f "$exp/decode/logits/$part/.done" ]; then
-            echo "Dumping logits of '$data/$part'"
+            echo "Dumping logits of '$bench/$part'"
             mkdir -p "$exp/decode/logits/$part"
             ./mms.py decode \
                 --dump-logits "$exp/decode/logits/$part" \
-                "$exp" "$data/$part" "/dev/null"
+                "$exp" "$bench/$part" "/dev/null"
             touch "$exp/decode/logits/$part/.done"
             if $only; then exit 0; fi
         fi
@@ -180,33 +208,19 @@ else
         fi
     fi
 
-for part in dev test; do
-    if ! [ -f "$exp/decode/${part}_${name}.trn_phone" ]; then
-        echo "Decoding $part"
-        ./prep/logits-to-trn-via-pyctcdecode.py \
-            --char "${lm_args[@]}" \
-            --words "etc/lm_words.txt" \
-            --width $width \
-            --beta $beta \
-            --alpha-inv $alpha_inv \
-            --token2id "$exp/token2id" \
-            "$exp/decode/"{logits/$part,${part}_$name.trn}
-        filter "$exp/decode/${part}_$name.trn"
-        if $only; then exit 0; fi
-    fi
-done
-
-for er in filt char phone; do
-    echo "===================================================================="
-    echo "                       ERROR TYPE: $er                              "
-    echo "===================================================================="
-    echo ""
     for part in dev test; do
-        ./prep/error-rates-from-trn.py \
-            --suppress-warning --ignore-empty-refs --differences \
-            --bootstrap-samples "$bootstrap_samples" \
-            "$data/$part/ref.trn_$er" \
-            "$exp/decode/${part}_"*".trn_$er"
-        echo ""
+        if ! [ -f "$exp/decode/${part}_${name}.trn_phone" ]; then
+            echo "Decoding $part"
+            ./prep/logits-to-trn-via-pyctcdecode.py \
+                --char "${lm_args[@]}" \
+                --words "etc/lm_words.txt" \
+                --width $width \
+                --beta $beta \
+                --alpha-inv $alpha_inv \
+                --token2id "$exp/token2id" \
+                "$exp/decode/"{logits/$part,${part}_$name.trn}
+            filter "$exp/decode/${part}_$name.trn"
+            if $only; then exit 0; fi
+        fi
     done
-done
+fi
