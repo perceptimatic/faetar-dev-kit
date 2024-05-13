@@ -123,6 +123,16 @@ for part in train dev test; do
         ./mms.py compile-metadata "$bench/$part" "$data/$part"
         if $only; then exit 0; fi
     fi
+
+    if ! [ -f "$data/$part/trn" ]; then
+        echo "Creating reference trn file in '$data/$part'"
+        :> "$data/$part/trn"
+        for file in "$bench"/"$part"/*.wav; do
+            filename="$(basename "$file" .wav)"
+            printf "%s (%s)\n" "$(< "${file%%.wav}.txt")" "$filename" >> "$data/$part/trn"
+        done
+        if $only; then exit 0; fi
+    fi
 done
 
 if ! [ -f "$exp/vocab.json" ]; then
@@ -209,10 +219,13 @@ else
     done
 fi
 
-for part in dev test; do
-    ./prep/error-rates-from-trn.py \
-        --suppress-warning --ignore-empty-refs --differences \
-        "$data/$part/trn" \
-        "$exp/decode/${part}_"*".trn"
+for er in wer cer per; do
+    echo "===================================================================="
+    echo "                       ERROR TYPE: $er                              "
+    echo "===================================================================="
     echo ""
+    for part in dev test; do
+        ./evaluate_asr.sh -d "$data" -e "$exp" -p "$part" -r "$er"
+        echo ""
+    done
 done
