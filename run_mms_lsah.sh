@@ -131,6 +131,17 @@ if ! [ -f "$exp/vocab.json" ]; then
     if $only; then exit 0; fi
 fi
 
+for part in train dev test; do
+    if ! [ -f "$data/$part/trn" ]; then
+        echo "Creating $data/$part/trn"
+        :> "$data/$part/trn"
+        for file in "$bench"/"$part"/*.wav; do
+            filename="$(basename "$file" .wav)"
+            printf "%s (%s)\n" "$(< "${file%%.wav}.txt")" "$filename" >> "$data/$part/trn"
+        done
+    fi
+done
+
 if ! [ -f "$exp/token2id" ]; then
     echo "Creating $exp/token2id"
     cut -d ',' -f 2 "$data/train/metadata.csv" |
@@ -224,3 +235,11 @@ else
         fi
     done
 fi
+
+for part in dev test; do
+    ./prep/error-rates-from-trn.py \
+        --suppress-warning --ignore-empty-refs --differences \
+        "$data/$part/trn" \
+        "$exp/decode/${part}_"*".trn"
+    echo ""
+done
