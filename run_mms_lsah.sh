@@ -224,7 +224,6 @@ for er in filt char phone; do
         ./prep/error-rates-from-trn.py \
             --suppress-warning --ignore-empty-refs --differences \
             --bootstrap-samples "$bootstrap_samples" \
-            --bootstrap-utt2grp "$data/$part/utt2rec" \
             "$data/$part/ref.trn_$er" \
             "$exp/decode/${part}_"*".trn_$er"
         echo ""
