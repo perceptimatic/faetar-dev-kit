@@ -74,7 +74,7 @@ for x in test dev train; do
         awk 'BEGIN {print "file_name,sentence"} {gsub(/[\(\)]/, "", $NF); filename=$NF; NF--; print filename","$0}' "$data_dir"/prep/trn_"$x" > "$tempfile1"
         awk 'BEGIN {print "file_name,sentence"} {gsub(/[\(\)]/, "", $NF); filename=$NF; NF--; print filename","$0}' "$exp_dir"/"$out_dir"/trn_dec_"$x" > "$tempfile2"
 
-        python3 ./step.py evaluate --error-type "$y" \
+        python3 ./mms.py evaluate --error-type "$y" \
         "$tempfile1" "$tempfile2" > "$exp_dir"/"$out_dir"/error_report_eval_"$x"_"$y"
       fi
     done
