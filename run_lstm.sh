@@ -35,7 +35,7 @@ conf_dir="conf/lstm"
 mkdir -p "$exp_dir"/"$out_dir"
 
 if [ ! -d ""$exp_dir"/"$out_dir"/conf" ]; then
-    cp "$conf_dir"/* "$exp_dir"/"$out_dir"/conf
+    cp "$conf_dir"/* "$exp_dir"/"$out_dir"/conf/
 fi
 
 # fixes vocab size

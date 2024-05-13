@@ -175,29 +175,39 @@ else
             echo "Constructing '$lm'"
             mkdir -p "$exp/lm"
             ./prep/ngram_lm.py -o $lm_ord -t 0 1 < "etc/lm_text.txt" > "${lm}_"
-            mv "$lm"{_,}
+            mv "${lm}"{_,}
             if $only; then exit 0; fi
         fi
     fi
 
-    if ! [ -f "$exp/token2id" ]; then
-        echo "Constructing '$exp/token2id'"
-        ./mms.py vocab-to-token2id "$exp/"{vocab.json,token2id}
+for part in dev test; do
+    if ! [ -f "$exp/decode/${part}_${name}.trn_phone" ]; then
+        echo "Decoding $part"
+        ./prep/logits-to-trn-via-pyctcdecode.py \
+            --char "${lm_args[@]}" \
+            --words "etc/lm_words.txt" \
+            --width $width \
+            --beta $beta \
+            --alpha-inv $alpha_inv \
+            --token2id "$exp/token2id" \
+            "$exp/decode/"{logits/$part,${part}_$name.trn}
+        filter "$exp/decode/${part}_$name.trn"
         if $only; then exit 0; fi
     fi
+done
 
+for er in filt char phone; do
+    echo "===================================================================="
+    echo "                       ERROR TYPE: $er                              "
+    echo "===================================================================="
+    echo ""
     for part in dev test; do
-        if ! [ -f "$exp/decode/${part}_${name}.trn_phone" ]; then
-            echo "Decoding $part"
-            ./prep/logits-to-trn-via-pyctcdecode.py \
-                --char "${lm_args[@]}" \
-                --words "etc/lm_words.txt" \
-                --width $width \
-                --beta $beta \
-                --alpha-inv $alpha_inv \
-                --token2id "$exp/token2id" \
-                "$exp/decode/"{logits/$part,${part}_$name.trn}
-            if $only; then exit 0; fi
-        fi
+        ./prep/error-rates-from-trn.py \
+            --suppress-warning --ignore-empty-refs --differences \
+            --bootstrap-samples "$bootstrap_samples" \
+            --bootstrap-utt2grp "$data/$part/utt2rec" \
+            "$data/$part/ref.trn_$er" \
+            "$exp/decode/${part}_"*".trn_$er"
+        echo ""
     done
-fi
+done
