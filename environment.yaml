@@ -1,22 +1,26 @@
-name: mms-faetar
+name: faetar-dev-kit
 channels:
   - huggingface
   - pytorch
   - nvidia
   - conda-forge
-  - sdrobert
   - nodefaults
 dependencies:
-  - datasets
-  - librosa
-  - evaluate
-  - pytorch-cuda
-  - pytorch
-  - jiwer>=3
-  - transformers
   - accelerate
-  - pyctcdecode
+  - cmake
+  - cuda-nvcc
+  - cxx-compiler
+  - datasets
   - diskcache
+  - evaluate
+  - jiwer>=3
+  - librosa
+  - make
+  - pyctcdecode
+  - pytorch-cuda=11.8
+  - pytorch=2.3.*
+  - sox
+  - transformers
   - pip:
     - "git+https://github.com/sdrobert/pydrobert-pytorch.git"
     - "git+https://github.com/sdrobert/kenlm"

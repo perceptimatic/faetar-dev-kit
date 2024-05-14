@@ -8,8 +8,11 @@ Data processing and baselines for the 2024 Faetar Grand Challenge
 ### Conda
 
 ``` sh
+# installs ALL dependencies in a conda environment and activates it
+# (if you're just training or decoding with one baseline, you probably
+# don't need all of them)
 conda env create -f environment.yaml
-conda activate faetar-mms
+conda activate faetar-dev-kit
 ```
 
 ### Pip
@@ -21,46 +24,41 @@ First, you should make sure you have a working and up-to-date Rust installation
 pip install -r requirements.txt
 ```
 
-## Running (basic)
-
-The following sequence of commands fine-tunes MMS on the data in `data/train`
-and `data/dev`, greedily decodes the data in `data/test`, and compares the
-resulting hypothesis transcripts to the reference transcripts in `data/test`,
-printing a Phone Error Rate (PER).
+## ASR baselines
 
 ``` sh
-# assuming data is located in the data/ dir
-mkdir -p exp/decode
+# assumes data/ is populated with {train,dev,test,...} partitions and
+# exp/ contains all artifacts (checkpoints, hypothesis transcriptions, etc.)
 
-# construct metadata.csv for each partition
-for d in data/{dev,test,train}; do
-    ./step.py compile-metadata $d
-done
+# Train and greedily decode MMS-LSAH
+# successfully trained on a single T4 core
+./run_mms_lsah.sh  # -h flag for options
 
-# construct vocab.json
-./step.py write-vocab data/train/metadata.csv exp/vocab.json
+# Train and greedily decode MMS-10min or MMS-1h
+# makes a new virtualenv; won't work on Git Bash
+#  (faetar-dev-kit should contain necessary build tools)
+# successfully trained on a single A40 core
+./run_ml_superb.sh  # 10min
+./run_ml_superb.sh -e exp/mms-1h -p 1h # 1h
 
-# train the model
-./step.py train exp/vocab.json data/{train,dev} exp
-
-# greedy decoding
-./step.py decode exp data/test exp/decode/test_greedy.csv
-
-# compute per
-./step.py evaluate data/test/metadata.csv exp/decode/test_greedy.csv
+# compute the PER, differences, and CIs of all models
+./evaluate_asr.sh -n 1000  # -h flag for options
 ```
-
-## Running (advanced)
-
-It is possible to do prefix search decoding with language model fusion. See
-[run.sh](./run.sh) for more details.
 
 ## License and attribution
 
-The MMS baseline adapts the excellent MMS fine-tuning [blog
+The *MMS-LSAH* baseline adapts the excellent MMS fine-tuning [blog
 post](https://huggingface.co/blog/mms_adapters) by Patrick von Platen to the
-challenge. We use Python scripts, not notebooks, because we're not savages.
+challenge. We use Python scripts, not notebooks, because we're not savages. I
+could not see any license information in the MMS blog post.
 
-This code is licensed with [Apache 2.0](./LICENSE). I could not see any license
-information in the blog post.
+[ESPNet](https://github.com/espnet/espnet/tree/master) is [Apache
+2.0](./LICENSE) licensed. The forked version of ESPNet used in the *MMS-10min*
+and *MMS-1h* baselines removes most of the recipes besides
+`espnet/egs2/ml_superb`. In `espnet/egs2/TEMPLATE/asr1/db.sh`, `MLSUPERB` was
+set to `downloads`. `espnet/egs2/ml_superb/asr1/local/single_lang_data_prep.py`
+was modified to handle Faetar. Config files were copied from ESPNet into this
+repository, modified to point to MMS. Finally, `run_ml_superb.sh` is very
+loosely based on `espnet/egs2/ml_superb/asr1/run_mono.sh`.
 
+This code is licensed with [Apache 2.0](./LICENSE).
