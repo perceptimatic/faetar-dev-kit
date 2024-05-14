@@ -5,9 +5,20 @@ Data processing and baselines for the 2024 Faetar Grand Challenge
 
 ## Installation & activation
 
+### Conda
+
 ``` sh
 conda env create -f environment.yaml
 conda activate faetar-mms
+```
+
+### Pip
+
+First, you should make sure you have a working and up-to-date Rust installation
+(`cargo -V`), since it is needed to compile some of the dependencies. 
+
+``` sh
+pip install -r requirements.txt
 ```
 
 ## Running (basic)
