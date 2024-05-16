@@ -89,4 +89,5 @@ for x in test dev train; do
          ./evaluate_asr.sh -d "$data_dir" -e "$exp_dir" -p "$x" -r "$y" > "$exp_dir"/"$out_dir"/decode/error_report_eval_"$x"_"$y"
       fi
     done
+
 done

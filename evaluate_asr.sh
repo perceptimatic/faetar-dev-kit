@@ -19,6 +19,7 @@ export PYTHONUTF8=1
 
 usage="Usage: $0 [-h] [-o] [-e DIR] [-m DIR] [-d DIR] [-p DIR] [-r {wer|cer|per}] [-n NNINT]"
 only=false
+split=false
 data=
 part=
 exp=
@@ -29,6 +30,9 @@ help="Run ASR evaluation on a partition
 Options
     -h          Display this help message and exit
     -o          Run only the next step of the script
+    -s          Split phones into their constituent characters for phone error rates
+                (e.g. 'dʒ' is split into 'd ʒ', 'sː' is split into 's ː')
+                (If false, then affricates and long phones are treated as their own phones) (default: '$split')
     -e DIR      The experiment directory (default: '$exp')
     -d DIR      The data directory (default: '$data')
     -p DIR      The partition directory (default: '$part')
@@ -36,7 +40,7 @@ Options
                 The type of error rate to compute (default: '$er')
     -n NNINT    Bootstrap samples. 0 is no bootstrap (default: $bootstrap_samples)"
 
-while getopts "hoe:d:p:r:n:" name; do
+while getopts "hose:d:p:r:n:" name; do
     case $name in
         h)
             echo "$usage"
@@ -45,6 +49,8 @@ while getopts "hoe:d:p:r:n:" name; do
             exit 0;;
         o)
             only=true;;
+        s)
+            split=false;;
         e)
             exp="$OPTARG";;
         d)
@@ -101,26 +107,28 @@ filter() {
     python3 ./prep/word2subword.py "$fn"{_wer,_cer_}
     mv "${fn}_cer"{_,}
 
-    # # splits words into individual phones but does not retain word boundaries
-    # # treats long phones and affricates as two separate phones
-    # sed 's/_ //g' "${fn}_cer" > "${fn}_per_"
-    # mv "${fn}_per"{_,}
+    if $split; then
+        # splits words into individual phones but does not retain word boundaries
+        # treats long phones and affricates as two separate phones
+        sed 's/_ //g' "${fn}_cer" > "${fn}_per_"
+        mv "${fn}_per"{_,}
+    else
+        # splits words into individual phones but does not retain word boundaries
+        awk \
+        'BEGIN {
+            FS = " ";
+            OFS = " ";
+        }
 
-    # splits words into individual phones but does not retain word boundaries
-    awk \
-    'BEGIN {
-        FS = " ";
-        OFS = " ";
-    }
-
-    {
-        file = $NF;
-        NF --;
-        gsub(/\[fp\]|d[zʒ]ː|tʃː|d[zʒ]|tʃ|\Sː|\S/, "& ");
-        gsub(/ +/, " ");
-        print $0 file;
-    }' "${fn}_wer" > "${fn}_per_"
-    mv "${fn}_per"{_,}
+        {
+            file = $NF;
+            NF --;
+            gsub(/d[zʒ]ː|tʃː|d[zʒ]|tʃ|\Sː|\S/, "& ");
+            gsub(/ +/, " ");
+            print $0 file;
+        }' "${fn}_wer" > "${fn}_per_"
+        mv "${fn}_per"{_,}
+    fi
 }
 
 if [ ! -f "prep/ngram_lm.py" ]; then

@@ -8,7 +8,7 @@ transducer_type: ctc # How to perform audio -> text transduction
 decoder_type: rwa # What decoder structure to use (if transducer_type = 'encdec')
 recur_encoder:
   name: recur_encoder  # String identifier for this object.
-  num_layers: 2 # Number of layers
+  num_layers: 3 # Number of layers
   recurrent_type: lstm # Type of recurrent cell
   bidirectional: true # Whether layers are bidirectional. If so, each direction has a hidden size of half the parameterized hidden_size. In this case, the parameter must be divisible by 2
 ff_encoder:
