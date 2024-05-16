@@ -140,27 +140,26 @@ if [ ! -f ""$exp_dir"/"$out_dir"/best.ckpt" ]; then
     "$data_dir"/train "$data_dir"/dev "$exp_dir"/"$out_dir"/best.ckpt
 fi
 
-mkdir -p "$exp_dir"/"$out_dir"/decode/
+mkdir -p "$exp_dir"/"$out_dir"/decode/trns/
+mkdir -p "$exp_dir"/"$out_dir"/decode/work_trns/
+
 
 for x in test dev train; do
-  if [ ! -f ""$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn" ]; then
-    tempfile=$(mktemp)
-
+  if [ ! -f ""$exp_dir"/"$out_dir"/decode/trns/"$x"_"$name".trn" ]; then
     if [ "$lm_ord" -eq 0 ]; then
       name="greedy"
-      
-      if [ ! -f "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name".done ]; then
+      if [ ! -f "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name"/.done ]; then
         python3 prep/asr-baseline.py \
           --read-model-yaml "$exp_dir"/"$out_dir"/conf/model.yaml \
           decode \
           --read-data-yaml "$exp_dir"/"$out_dir"/conf/data.yaml \
           "$exp_dir"/"$out_dir"/best.ckpt "$data_dir"/"$x" "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name"
         
-        touch "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name".done
+        touch "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name"/.done
       fi
 
       torch-token-data-dir-to-trn \
-        "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name" --swap "$data_dir"/token2id "$tempfile"
+        "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name" --swap "$data_dir"/token2id ""$exp_dir"/"$out_dir"/decode/work_trns/trn_dec_"$x"_"$name""
 
     else
       if [ "$lm_ord" -eq 1 ]; then
@@ -180,7 +179,7 @@ for x in test dev train; do
         fi
       fi
 
-      if [ ! -f "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name".done ]; then
+      if [ ! -f "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name"/.done ]; then
         python3 prep/asr-baseline.py \
           --read-model-yaml "$exp_dir"/"$out_dir"/conf/model.yaml \
           decode \
@@ -188,7 +187,7 @@ for x in test dev train; do
           --write-logits \
           "$exp_dir"/"$out_dir"/best.ckpt "$data_dir"/"$x" "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name"
         
-        touch "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name".done
+        touch "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name"/.done
       fi
 
       python3 prep/logits-to-trn-via-pyctcdecode.py \
@@ -198,7 +197,7 @@ for x in test dev train; do
         --beta $beta \
         --alpha-inv $alpha_inv \
         --token2id "$data_dir"/token2id \
-        "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name" "$tempfile"
+        "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name" ""$exp_dir"/"$out_dir"/decode/work_trns/trn_dec_"$x"_"$name""
     fi
 
     # merges phones back into words
@@ -210,13 +209,15 @@ for x in test dev train; do
       gsub(/_/, " ");
       gsub(/ +/, " ");
       print $0 " " file;
-    }' "$tempfile" > "$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn
+    }' ""$exp_dir"/"$out_dir"/decode/work_trns/trn_dec_"$x"_"$name"" > "$exp_dir"/"$out_dir"/decode/trns/"$x"_"$name".trn
+
+    rm -rf "$exp_dir"/"$out_dir"/decode/work_trns/
 
   fi
 
   for y in per cer wer; do
     if [ ! -f ""$exp_dir"/"$out_dir"/decode/error_report_eval_"$x"_"$y"" ]; then
-       ./evaluate_asr.sh -d "$data_dir" -e "$exp_dir" -p "$x" -r "$y" > "$exp_dir"/"$out_dir"/decode/error_report_eval_"$x"_"$y"
+       ./evaluate_asr.sh -d "$data_dir" -e "$exp_dir/decode/" -p "$x" -r "$y" > "$exp_dir"/"$out_dir"/decode/error_report_eval_"$x"_"$y"
     fi
   done
 done
