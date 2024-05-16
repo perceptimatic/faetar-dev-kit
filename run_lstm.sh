@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-usage="Usage: $0 [-h] [-w NAT] [-a NAT] [-B NAT] [-l NNINT] data-dir out-dir"
-data_dir="$1"
-out_dir="$2"
+usage="Usage: $0 [-h] [-e DIR] [-O DIR] [-d DIR] [-c DIR] [-w NAT] [-a NAT] [-B NAT] [-l NNINT]"
+data_dir=data/lstm
+out_dir=
 conf_dir="conf/lstm"
 exp_dir="exp/lstm"
 width=100
@@ -28,18 +28,30 @@ help="Train and decode with the lstm baseline
 
 Options
     -h          Display this help message and exit
+    -e DIR      The experiment directory (default: '$exp_dir')
+    -O DIR      The output subdirectory in the experiment directory (default: '$out_dir')
+    -d DIR      The data directory (default: '$data_dir')
+    -c DIR      The conf files directory (default: '$conf_dir')
     -w NAT      pyctcdecode's beam width (default: $width)
     -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
     -B NAT      pyctcdecode's beta, inverted (default: $beta)
     -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)"
 
-while getopts "hw:a:B:l:" name; do
+while getopts "he:O:d:c:w:a:B:l:" name; do
     case $name in
         h)
             echo "$usage"
             echo ""
             echo "$help"
             exit 0;;
+        e)
+            exp_dir="$OPTARG";;
+        O)
+            out_dir="$OPTARG";;
+        d)
+            data_dir="$OPTARG";;
+        c)
+            conf_dir="$OPTARG";;
         w)
             width="$OPTARG";;
         a)
@@ -54,6 +66,22 @@ while getopts "hw:a:B:l:" name; do
     esac
 done
 shift $(($OPTIND - 1))
+if [ ! -d "$data_dir" ]; then
+    echo -e "'$data_dir' is not a directory! Set -d appropriately!"
+    exit 1
+fi
+if ! mkdir -p "$exp_dir" 2> /dev/null; then
+    echo -e "Could not create '$exp'! set -e appropriately!"
+    exit 1
+fi
+if ! mkdir -p "$exp_dir"/"$out_dir" 2> /dev/null; then
+    echo -e "Could not create '$exp_dir/$out_dir'! set -O appropriately!"
+    exit 1
+fi
+if [ ! -d "$conf_dir" ]; then
+    echo -e "'$conf_dir' is not a directory! Set -c appropriately!"
+    exit 1
+fi
 if ! [ "$width" -gt 0 ] 2> /dev/null; then
     echo -e "$width is not a natural number! set -w appropriately!"
     exit 1
@@ -71,19 +99,7 @@ if ! [ "$lm_ord" -ge 0 ] 2> /dev/null; then
     exit 1
 fi
 
-if [ $# -ne 2 ]; then
-  echo "$usage"
-  exit 1
-fi
-
-if [ ! -d "$1" ]; then
-  echo "$0: '$1' is not a directory"
-  exit 1
-fi
-
 set -eo pipefail
-
-mkdir -p "$exp_dir"/"$out_dir"
 
 if [ ! -d ""$exp_dir"/"$out_dir"/conf" ]; then
     mkdir -p "$exp_dir"/"$out_dir"/conf
@@ -111,9 +127,8 @@ mkdir -p "$exp_dir"/"$out_dir"/decode/
 for x in test dev train; do
   if [ ! -f ""$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn" ]; then
 
-    tempfile=$(mktemp)
-
     if [ "$lm_ord" -eq 0 ]; then
+      tempfile=$(mktemp)
       name="greedy"
       
       if [ ! -f "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name".done ]; then
@@ -128,6 +143,17 @@ for x in test dev train; do
 
       torch-token-data-dir-to-trn \
         "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name" --swap "$data_dir"/token2id "$tempfile"
+
+      # merges phones back into words
+      awk \
+      '{
+        file = $NF;
+        NF --;
+        gsub(/ /, "");
+        gsub(/_/, " ");
+        gsub(/ +/, " ");
+        print $0 " " file;
+      }' "$tempfile" > "$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn
 
     else
       if [ "$lm_ord" -eq 1 ]; then
@@ -158,26 +184,16 @@ for x in test dev train; do
         touch "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name".done
       fi
 
-      python3 logits-to-trn-via-pyctcdecode.py \
+      python3 prep/logits-to-trn-via-pyctcdecode.py \
         --char "${lm_args[@]}" \
         --words "etc/lm_words.txt" \
         --width $width \
         --beta $beta \
         --alpha-inv $alpha_inv \
         --token2id "$data_dir"/token2id \
-        "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name" "$tempfile"
+        "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name" "$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn
     fi
 
-    # merges phones back into words
-    awk \
-    '{
-      file = $NF;
-      NF --;
-      gsub(/ /, "");
-      gsub(/_/, " ");
-      gsub(/ +/, " ");
-      print $0 " " file;
-    }' "$tempfile" > "$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn
   fi
 
   for y in per cer wer; do
