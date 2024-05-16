@@ -99,6 +99,24 @@ if ! [ "$lm_ord" -ge 0 ] 2> /dev/null; then
     exit 1
 fi
 
+# splits text into individual phones + turns spaces into _
+function split_text () {
+  text="$1"
+
+  awk \
+  'BEGIN {
+    FS = " ";
+    OFS = " ";
+  }
+
+  {
+    gsub(/ /, "_");
+    gsub(/\[fp\]|d[zʒ]ː|tʃː|d[zʒ]|tʃ|\Sː|\S/, "& ");
+    gsub(/ +/, " ");
+    print $0;
+  }' "$text"
+}
+
 set -eo pipefail
 
 if [ ! -d ""$exp_dir"/"$out_dir"/conf" ]; then
@@ -126,9 +144,9 @@ mkdir -p "$exp_dir"/"$out_dir"/decode/
 
 for x in test dev train; do
   if [ ! -f ""$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn" ]; then
+    tempfile=$(mktemp)
 
     if [ "$lm_ord" -eq 0 ]; then
-      tempfile=$(mktemp)
       name="greedy"
       
       if [ ! -f "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name".done ]; then
@@ -144,17 +162,6 @@ for x in test dev train; do
       torch-token-data-dir-to-trn \
         "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name" --swap "$data_dir"/token2id "$tempfile"
 
-      # merges phones back into words
-      awk \
-      '{
-        file = $NF;
-        NF --;
-        gsub(/ /, "");
-        gsub(/_/, " ");
-        gsub(/ +/, " ");
-        print $0 " " file;
-      }' "$tempfile" > "$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn
-
     else
       if [ "$lm_ord" -eq 1 ]; then
         name="w${width}_nolm"
@@ -168,7 +175,7 @@ for x in test dev train; do
         if ! [ -f "$lm" ]; then
           echo "Constructing '$lm'"
           mkdir -p "$exp_dir/$out_dir/lm"
-          python3 prep/ngram_lm.py -o $lm_ord -t 0 1 < "etc/lm_text.txt" > "${lm}_"
+          python3 prep/ngram_lm.py -o $lm_ord -t 0 1 <<< "$(split_text etc/lm_text.txt)" > "${lm}_"
           mv "$lm"{_,}
         fi
       fi
@@ -191,8 +198,19 @@ for x in test dev train; do
         --beta $beta \
         --alpha-inv $alpha_inv \
         --token2id "$data_dir"/token2id \
-        "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name" "$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn
+        "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name" "$tempfile"
     fi
+
+    # merges phones back into words
+    awk \
+    '{
+      file = $NF;
+      NF --;
+      gsub(/ /, "");
+      gsub(/_/, " ");
+      gsub(/ +/, " ");
+      print $0 " " file;
+    }' "$tempfile" > "$exp_dir"/"$out_dir"/decode/"$x"_"$name".trn
 
   fi
 
