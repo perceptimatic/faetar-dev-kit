@@ -43,7 +43,7 @@ Options
     -B NAT      pyctcdecode's beta, inverted (default: $beta)
     -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)"
 
-while getopts "hoe:b:d:c:C:a:B:l:" name; do
+while getopts "hoe:b:d:c:C:w:a:B:l:" name; do
     case $name in
         h)
             echo "$usage"
@@ -62,6 +62,8 @@ while getopts "hoe:b:d:c:C:a:B:l:" name; do
             training_kwargs="$OPTARG";;
         C)
             wav2vec2_kwargs="$OPTARG";;
+        w)
+            width="$OPTARG";;
         a)
             alpha_inv="$OPTARG";;
         B)
@@ -94,6 +96,10 @@ if ! [ -f "$training_kwargs" ]; then
 fi
 if ! [ -f "$wav2vec2_kwargs" ]; then
     echo -e "'$wav2vec2_kwargs' is not a file! Set -C appropriately!"
+    exit 1
+fi
+if ! [ "$width" -gt 0 ] 2> /dev/null; then
+    echo -e "$width is not a natural number! set -w appropriately!"
     exit 1
 fi
 if ! [ "$alpha_inv" -gt 0 ] 2> /dev/null; then
