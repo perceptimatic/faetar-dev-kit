@@ -152,8 +152,8 @@ pushd egs2/ml_superb/asr1
 if ! [ -f downloads/hlvc/.done ]; then
     echo "Formatting data for ML-SUPERB in $PWD/downloads"
     mkdir -p downloads/hlvc/fae/wav
-    find "$data/1hr" "$data/dev" "$data/test" -name '*.wav' -exec ln -sf {} downloads/hlvc/fae/wav/ \;
-    find "$data/1hr" -name '*.txt' |
+    find "$data/1h" "$data/dev" "$data/test" -name '*.wav' -exec ln -sf {} downloads/hlvc/fae/wav/ \;
+    find "$data/1h" -name '*.txt' |
         sort |
         awk -F "/" '{split($NF, bn, "."); getline < $0; print bn[1]" A "$0}' > downloads/hlvc/fae/transcript_1h_train.txt
     find "$data/10min" -name '*.txt' |
