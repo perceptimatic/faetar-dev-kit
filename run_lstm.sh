@@ -35,11 +35,12 @@ conf_dir="conf/lstm"
 mkdir -p "$exp_dir"/"$out_dir"
 
 if [ ! -d ""$exp_dir"/"$out_dir"/conf" ]; then
+    mkdir -p "$exp_dir"/"$out_dir"/conf
     cp "$conf_dir"/* "$exp_dir"/"$out_dir"/conf/
 fi
 
 # fixes vocab size
-awk -v number="$(wc -l < "$data_dir"/prep/token2id)" \
+awk -v number="$(wc -l < "$data_dir"/token2id)" \
 'NR == 5 {print "vocab_size: " number} NR != 5 {print $0}' "$exp_dir"/"$out_dir"/conf/model.yaml \
 > "$exp_dir"/"$out_dir"/conf/model.yaml_
 mv "$exp_dir"/"$out_dir"/conf/model.yaml{_,}
@@ -53,34 +54,39 @@ if [ ! -f ""$exp_dir"/"$out_dir"/best.ckpt" ]; then
     --read-training-yaml "$exp_dir"/"$out_dir"/conf/training.yaml \
     "$data_dir"/train "$data_dir"/dev "$exp_dir"/"$out_dir"/best.ckpt
 fi
+
 for x in test dev train; do
-    if [ ! -f ""$exp_dir"/"$out_dir"/trn_dec_"$x"" ]; then
-        # no lm
+
+    # no lm
+    if [ ! -f ""$exp_dir"/"$out_dir"/decode/trn_dec_"$x"" ]; then
         python3 prep/asr-baseline.py \
         --read-model-yaml "$exp_dir"/"$out_dir"/conf/model.yaml \
         decode \
         --read-data-yaml "$exp_dir"/"$out_dir"/conf/data.yaml \
         "$exp_dir"/"$out_dir"/best.ckpt "$data_dir"/"$x" "$exp_dir"/"$out_dir"/hyp_"$x"
 
+        mkdir -p "$exp_dir"/"$out_dir"/decode/
+
         torch-token-data-dir-to-trn \
-        "$exp_dir"/"$out_dir"/hyp_"$x" --swap "$data_dir"/prep/token2id "$exp_dir"/"$out_dir"/trn_dec_"$x"
+        "$exp_dir"/"$out_dir"/hyp_"$x" --swap "$data_dir"/token2id "$exp_dir"/"$out_dir"/decode/trn_dec_"$x"
+    fi
+
+    if [ ! -f ""$exp_dir"/"$out_dir"/decode/"$x"_greedy.trn" ]; then
+        # merges phones back into words
+        awk \
+        '{
+          file = $NF;
+          NF --;
+          gsub(/ /, "");
+          gsub(/_/, " ");
+          gsub(/ +/, " ");
+          print $0 " " file;
+        }' "$exp_dir"/"$out_dir"/decode/trn_dec_"$x" > "$exp_dir"/"$out_dir"/decode/"$x"_greedy.trn
     fi
 
     for y in per cer wer; do
-      if [ ! -f ""$exp_dir"/"$out_dir"/error_report_eval_"$x"_"$y"" ]; then
-        tempfile1="$(mktemp)"
-        tempfile2="$(mktemp)"
-
-        awk 'BEGIN {print "file_name,sentence"} {gsub(/[\(\)]/, "", $NF); filename=$NF; NF--; print filename","$0}' "$data_dir"/prep/trn_"$x" > "$tempfile1"
-        awk 'BEGIN {print "file_name,sentence"} {gsub(/[\(\)]/, "", $NF); filename=$NF; NF--; print filename","$0}' "$exp_dir"/"$out_dir"/trn_dec_"$x" > "$tempfile2"
-
-        python3 ./mms.py evaluate --error-type "$y" \
-        "$tempfile1" "$tempfile2" > "$exp_dir"/"$out_dir"/error_report_eval_"$x"_"$y"
+      if [ ! -f ""$exp_dir"/"$out_dir"/decode/error_report_eval_"$x"_"$y"" ]; then
+         ./evaluate_asr.sh -d "$data_dir" -e "$exp_dir" -p "$x" -r "$y" > "$exp_dir"/"$out_dir"/decode/error_report_eval_"$x"_"$y"
       fi
     done
-    
-    # if [ ! -f ""$exp_dir"/"$out_dir"/error_report_"$x"" ]; then
-    #     python3 prep/error-rates-from-trn.py \
-    #     "$data_dir"/prep/trn_"$x" "$exp_dir"/"$out_dir"/trn_dec_"$x" > "$exp_dir"/"$out_dir"/error_report_"$x"
-    # fi
 done

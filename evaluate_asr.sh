@@ -90,14 +90,36 @@ fi
 
 set -eo pipefail
 
-
 filter() {
     fn="$1"
+    # removes words that are contained inside of []
+    # or words that are contained inside of <> followed by a space (but does not remove '<>', '<> ' or '<>>')
     sed 's/\[[^]][^]]*\] //g; s/<[^>][^>]*> //g;' "$fn" > "${fn}_wer_"
     mv "${fn}_wer"{_,}
-    ./prep/word2subword.py "$fn"{_wer,_cer_}
+
+    # splits words into individual characters + turns spaces into _
+    python3 ./prep/word2subword.py "$fn"{_wer,_cer_}
     mv "${fn}_cer"{_,}
-    sed 's/_ //g' "${fn}_cer" > "${fn}_per_"
+
+    # # splits words into individual phones but does not retain word boundaries
+    # # treats long phones and affricates as two separate phones
+    # sed 's/_ //g' "${fn}_cer" > "${fn}_per_"
+    # mv "${fn}_per"{_,}
+
+    # splits words into individual phones but does not retain word boundaries
+    awk \
+    'BEGIN {
+        FS = " ";
+        OFS = " ";
+    }
+
+    {
+        file = $NF;
+        NF --;
+        gsub(/\[fp\]|d[zʒ]ː|tʃː|d[zʒ]|tʃ|\Sː|\S/, "& ");
+        gsub(/ +/, " ");
+        print $0 file;
+    }' "${fn}_wer" > "${fn}_per_"
     mv "${fn}_per"{_,}
 }
 
@@ -131,7 +153,7 @@ for i in "${!hyps[@]}"; do
     hyps[$i]="${hyp}_${er}"
 done
 
-./prep/error-rates-from-trn.py \
+python3 ./prep/error-rates-from-trn.py \
     --suppress-warning --differences \
     --bootstrap-samples "$bootstrap_samples" \
     --bootstrap-utt2grp "$data/$part/utt2rec" \
