@@ -50,7 +50,7 @@ while getopts "hose:d:p:r:n:" name; do
         o)
             only=true;;
         s)
-            split=false;;
+            split=true;;
         e)
             exp="$OPTARG";;
         d)
@@ -100,7 +100,7 @@ filter() {
     fn="$1"
     # removes words that are contained inside of []
     # or words that are contained inside of <> followed by a space (but does not remove '<>', '<> ' or '<>>')
-    sed 's/\[[^]][^]]*\] //g; s/<[^>][^>]*> //g;' "$fn" > "${fn}_wer_"
+    sed 's/\[[^]][^]]*\]//g; s/<[^>][^>]*> //g; s/ +/ /g' "$fn" > "${fn}_wer_"
     mv "${fn}_wer"{_,}
 
     # splits words into individual characters + turns spaces into _
