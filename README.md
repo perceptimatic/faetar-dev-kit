@@ -17,11 +17,12 @@ conda activate faetar-dev-kit
 
 ### Pip
 
-First, you should make sure you have a working and up-to-date Rust installation
-(`cargo -V`), since it is needed to compile some of the dependencies. 
-
 ``` sh
 pip install -r requirements.txt
+
+# If pip cannot find binary wheels, and has to be built from source, an up to
+# date Rust Compiler and Arrow installation may be needed as dependencies.
+# These will probably be available through your package manager.
 ```
 
 ## ASR baselines
