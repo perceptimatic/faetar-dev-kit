@@ -20,7 +20,7 @@ out_dir=
 conf_dir="conf/lstm"
 exp_dir="exp/lstm"
 width=100
-alpha_inv=1
+alpha_inv=10
 beta=1
 lm_ord=0
 name=
@@ -34,7 +34,7 @@ Options
     -c DIR      The conf files directory (default: '$conf_dir')
     -w NAT      pyctcdecode's beam width (default: $width)
     -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
-    -B NAT      pyctcdecode's beta, inverted (default: $beta)
+    -B NAT      pyctcdecode's beta (default: $beta)
     -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)"
 
 while getopts "he:O:d:c:w:a:B:l:" name; do
@@ -141,25 +141,40 @@ if [ ! -f ""$exp_dir"/"$out_dir"/best.ckpt" ]; then
 fi
 
 mkdir -p "$exp_dir"/"$out_dir"/decode/trns/
-mkdir -p "$exp_dir"/"$out_dir"/decode/work_trns/
+mkdir -p "$exp_dir"/"$out_dir"/decode/reps/
 
-
-for x in test dev train; do
+for x in dev test train; do
   if [ ! -f ""$exp_dir"/"$out_dir"/decode/trns/"$x"_"$name".trn" ]; then
+
     if [ "$lm_ord" -eq 0 ]; then
+      mkdir -p "$exp_dir"/"$out_dir"/decode/work_trns/
       name="greedy"
+
       if [ ! -f "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name"/.done ]; then
         python3 prep/asr-baseline.py \
           --read-model-yaml "$exp_dir"/"$out_dir"/conf/model.yaml \
           decode \
           --read-data-yaml "$exp_dir"/"$out_dir"/conf/data.yaml \
           "$exp_dir"/"$out_dir"/best.ckpt "$data_dir"/"$x" "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name"
-        
+
         touch "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name"/.done
       fi
 
       torch-token-data-dir-to-trn \
         "$exp_dir"/"$out_dir"/decode/hyp_"$x"_"$name" --swap "$data_dir"/token2id ""$exp_dir"/"$out_dir"/decode/work_trns/trn_dec_"$x"_"$name""
+
+      # merges phones back into words
+      awk \
+      '{
+        file = $NF;
+        NF --;
+        gsub(/ /, "");
+        gsub(/_/, " ");
+        gsub(/ +/, " ");
+        print $0 " " file;
+      }' ""$exp_dir"/"$out_dir"/decode/work_trns/trn_dec_"$x"_"$name"" > "$exp_dir"/"$out_dir"/decode/trns/"$x"_"$name".trn
+
+      rm -rf "$exp_dir"/"$out_dir"/decode/work_trns/
 
     else
       if [ "$lm_ord" -eq 1 ]; then
@@ -174,7 +189,7 @@ for x in test dev train; do
         if ! [ -f "$lm" ]; then
           echo "Constructing '$lm'"
           mkdir -p "$exp_dir/$out_dir/lm"
-          python3 prep/ngram_lm.py -o $lm_ord -t 0 1 <<< "$(split_text etc/lm_text.txt)" > "${lm}_"
+          python3 prep/ngram_lm.py -o $lm_ord -t 0 1 < "etc/lm_text.txt" > "${lm}_"
           mv "$lm"{_,}
         fi
       fi
@@ -197,27 +212,13 @@ for x in test dev train; do
         --beta $beta \
         --alpha-inv $alpha_inv \
         --token2id "$data_dir"/token2id \
-        "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name" ""$exp_dir"/"$out_dir"/decode/work_trns/trn_dec_"$x"_"$name""
+        "$exp_dir"/"$out_dir"/decode/hyp_logits_"$x"_"$name" "$exp_dir"/"$out_dir"/decode/trns/"$x"_"$name".trn
     fi
-
-    # merges phones back into words
-    awk \
-    '{
-      file = $NF;
-      NF --;
-      gsub(/ /, "");
-      gsub(/_/, " ");
-      gsub(/ +/, " ");
-      print $0 " " file;
-    }' ""$exp_dir"/"$out_dir"/decode/work_trns/trn_dec_"$x"_"$name"" > "$exp_dir"/"$out_dir"/decode/trns/"$x"_"$name".trn
-
-    rm -rf "$exp_dir"/"$out_dir"/decode/work_trns/
-
   fi
 
   for y in per cer wer; do
     if [ ! -f ""$exp_dir"/"$out_dir"/decode/error_report_eval_"$x"_"$y"" ]; then
-       ./evaluate_asr.sh -d "$data_dir" -e "$exp_dir/decode/" -p "$x" -r "$y" > "$exp_dir"/"$out_dir"/decode/error_report_eval_"$x"_"$y"
+       ./evaluate_asr.sh -d "$data_dir" -e "$exp_dir/$out_dir/decode" -p "$x" -r "$y" > "$exp_dir"/"$out_dir"/decode/reps/error_report_eval_"$x"_"$y"
     fi
   done
 done
