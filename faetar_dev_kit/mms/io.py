@@ -18,6 +18,8 @@ import json
 
 from re import compile
 
+from tqdm import tqdm
+
 from csv import DictReader
 from collections import Counter
 
@@ -31,7 +33,8 @@ def compile_metadata(options: Options):
     fp = (options.data / "metadata.csv").open("w")
     fp.write("file_name,sentence\n")
 
-    for wav in sorted(options.bench.glob("*.wav")):
+    for wav in tqdm(sorted(options.data.glob("*.wav")),
+                    f"Processing directory {options.data}"):
         entries = [wav.name]
         if not options.no_sentence:
             txt = options.bench / (wav.stem + ".txt")

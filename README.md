@@ -1,7 +1,11 @@
 # faetar-dev-kit
 Data processing and baselines for the 2024 Faetar Grand Challenge
 
-## Installation
+
+
+## Installation & activation
+
+### Conda
 
 ``` sh
 # installs ALL dependencies in a conda environment and activates it
@@ -9,6 +13,16 @@ Data processing and baselines for the 2024 Faetar Grand Challenge
 # don't need all of them)
 conda env create -f environment.yaml
 conda activate faetar-dev-kit
+```
+
+### Pip
+
+``` sh
+pip install -r requirements.txt
+
+# If pip cannot find binary wheels, and has to be built from source, an up to
+# date Rust Compiler and Arrow installation may be needed as dependencies.
+# These will probably be available through your package manager.
 ```
 
 ## ASR baselines
