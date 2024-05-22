@@ -1,5 +1,5 @@
 name: baseline  # String identifier for this object.
-input_size: 41 # Size of input feature vectors (pre stacking)
+input_size: 1280 # Size of input feature vectors (pre stacking)
 stack: 3 # Number of feature vectors to stack together
 hidden_size: 1024 # Size of encoder hidden states/output
 vocab_size: 80 # Size of output vocabulary (excluding eos and blank)
