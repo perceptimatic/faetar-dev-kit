@@ -33,7 +33,7 @@ def compile_metadata(options: Options):
     fp = (options.data / "metadata.csv").open("w")
     fp.write("file_name,sentence\n")
 
-    for wav in tqdm(sorted(options.data.glob("*.wav")),
+    for wav in tqdm(sorted(options.bench.glob("*.wav")),
                     f"Processing directory {options.data}"):
         entries = [wav.name]
         if not options.no_sentence:
