@@ -158,7 +158,6 @@ class Options(object):
     no_sentence: bool = False
 
     # compile-metadata args
-    bench: pathlib.Path
     data: pathlib.Path
 
     # write-vocab kwargs
@@ -206,11 +205,6 @@ class Options(object):
             action="store_true",
             help="do not add 'sentence' field to metadata.csv",
         )
-
-        cls._add_argument(
-            parser, "bench", type=ReadDirType, help="AudioFolder directory"
-        )
-
 
         cls._add_argument(
             parser, "data", type=ReadDirType, help="work directory"

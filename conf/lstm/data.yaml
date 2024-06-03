@@ -1,4 +1,4 @@
-batch_size: 4  # Number of elements in a batch.
+batch_size: 32  # Number of elements in a batch.
 drop_last: false # Whether to drop a batch when there are too few samples to match its size.
 num_length_buckets: 1 # If greater than 1, elements will be batched with other elements of similar length. For SpectDataSet, length is along the feature time dimension. For LangDataSet, length is the reference sequence length. Elements will be partioned roughly evenly into num_length_buckets. Increasing num_length_buckets will usually decrease the total amount of padding per batch at the cost of fewer candidates to choose from within batches.
 size_batch_by_length: false # Only matters when num_length_buckets > 1. If false, all buckets have the same batch size of batch_size. If true, buckets with shorter-length utterances will contain greater than batch_size elements per batch. Letting x be the batch size of a bucket, y be the length of the largest element in the bucket, and Y be the length of the largest element in the corpus, x is the greatest value such that x * y <= Y * batch_size

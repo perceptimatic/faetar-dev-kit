@@ -20,7 +20,6 @@ export PYTHONUTF8=1
 usage="Usage: $0 [-h] [-o] [-e DIR] [-b DIR] [-d DIR] [-w NAT] [-a NAT] [-B NAT] [-l NNINT]"
 only=false
 exp=exp/mms_lsah
-bench=
 data=data/mms_lsah
 width=100
 alpha_inv=1
@@ -34,7 +33,6 @@ Options
     -h          Display this help message and exit
     -o          Run only the next step of the script
     -e DIR      The experiment directory (default: '$exp')
-    -b DIR      The bench corpus directory
     -d DIR      The working data directory (default: '$data')
     -c FILE     Path to TrainingArguments JSON keyword args (default: '$training_kwargs')
     -C FILE     Path to Wav2Vec2Config JSON keyword args (default: '$wav2vec2_kwargs')
@@ -43,7 +41,7 @@ Options
     -B NAT      pyctcdecode's beta, inverted (default: $beta)
     -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)"
 
-while getopts "hoe:b:d:c:C:w:a:B:l:" name; do
+while getopts "hoe:d:c:C:w:a:B:l:" name; do
     case $name in
         h)
             echo "$usage"
@@ -54,8 +52,6 @@ while getopts "hoe:b:d:c:C:w:a:B:l:" name; do
             only=true;;
         e)
             exp="$OPTARG";;
-        b)
-            bench="$OPTARG";;
         d)
             data="$OPTARG";;
         c)
@@ -77,15 +73,11 @@ while getopts "hoe:b:d:c:C:w:a:B:l:" name; do
 done
 shift $(($OPTIND - 1))
 for part in train dev test; do
-    if [ ! -d "$bench/$part" ]; then
-        echo -e "'$bench/$part' is not a directory! set -b appropriately!"
+    if [ ! -d "$data/$part" ]; then
+        echo -e "'$data/$part' is not a directory! set -d appropriately!"
         exit 1
     fi
 done
-if ! mkdir -p "$data" 2> /dev/null; then
-    echo -e "Could not create '$data'! set -d appropriately!"
-    exit 1
-fi
 if ! mkdir -p "$exp" 2> /dev/null; then
     echo -e "Could not create '$exp'! set -e appropriately!"
     exit 1
@@ -126,14 +118,14 @@ for part in train dev test; do
     if ! [ -f "$data/$part/metadata.csv" ]; then
         echo "Creating metadata.csv in '$data/$part'"
         mkdir -p "$data/$part"
-        ./mms.py compile-metadata "$bench/$part" "$data/$part"
+        ./mms.py compile-metadata "$data/$part"
         if $only; then exit 0; fi
     fi
 
     if ! [ -f "$data/$part/trn" ]; then
         echo "Creating reference trn file in '$data/$part'"
         :> "$data/$part/trn"
-        for file in "$bench"/"$part"/*.wav; do
+        for file in "$data"/"$part"/*.wav; do
             filename="$(basename "$file" .wav)"
             printf "%s (%s)\n" "$(< "${file%%.wav}.txt")" "$filename" >> "$data/$part/trn"
         done
@@ -149,7 +141,7 @@ fi
 
 if ! [ -f "$exp/config.json" ]; then
     echo "Training model and writing to '$exp'"
-    ./mms.py train "$exp/vocab.json" "$bench/"{train,dev} "$exp"
+    ./mms.py train "$exp/vocab.json" "$data/"{train,dev} "$exp"
     if $only; then exit 0; fi
 fi
 
