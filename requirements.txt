@@ -1,4 +1,6 @@
 pyarrow==15.0.2
+numpy
+pandas
 soundfile
 jiwer
 torch
