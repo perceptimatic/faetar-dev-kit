@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from dataclasses import dataclass
 from functools import partial
+from textgrids import TextGrid
 import pandas as pd
 from typing import Generator
 from tqdm import tqdm
@@ -47,6 +48,27 @@ class Alignments:
         df[["onset", "offset"]] = df[["onset", "offset"]].astype(float)
         df["speaker"] = df["speaker"].apply(lambda s: s.removesuffix(" phones"))
         df["file"] = ali.stem
+        return df
+
+    @staticmethod
+    def load_textgrid(textgrid: Path):
+        """
+        Example .ali file:
+        ...
+        """
+        tg = TextGrid(textgrid)
+        tier = tg["phones"]
+
+        onset = [p.xmin for p in tier]
+        offset = [p.xmax for p in tier]
+        phone = [p.text for p in tier]
+        speaker = [textgrid.stem for _ in tier]
+        
+        cols = {"onset": onset, "offset": offset, "speaker": speaker, "phone": phone}
+        df = pd.DataFrame(cols)
+        df[["onset", "offset"]] = df[["onset", "offset"]].astype(float)
+        df["file"] = ali.stem
+
         return df
 
 class PhoneSeq:
