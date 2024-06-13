@@ -27,7 +27,7 @@ beta=1
 lm_ord=0
 training_kwargs=conf/mms_lsah/training_kwargs.json
 wav2vec2_kwargs=conf/mms_lsah/wav2vec2_kwargs.json
-dec_partitions=(unlab)
+dec_partitions=(train dev test)
 help="Train and decode with the mms-lsah baseline
 
 Options
