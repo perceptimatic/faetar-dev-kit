@@ -27,6 +27,7 @@ beta=1
 lm_ord=0
 training_kwargs=conf/mms_lsah/training_kwargs.json
 wav2vec2_kwargs=conf/mms_lsah/wav2vec2_kwargs.json
+dec_partitions=(unlab)
 help="Train and decode with the mms-lsah baseline
 
 Options
@@ -38,7 +39,7 @@ Options
     -C FILE     Path to Wav2Vec2Config JSON keyword args (default: '$wav2vec2_kwargs')
     -w NAT      pyctcdecode's beam width (default: $width)
     -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
-    -B NAT      pyctcdecode's beta, inverted (default: $beta)
+    -B NAT      pyctcdecode's beta (default: $beta)
     -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)"
 
 while getopts "hoe:d:c:C:w:a:B:l:" name; do
@@ -98,8 +99,8 @@ if ! [ "$alpha_inv" -gt 0 ] 2> /dev/null; then
     echo -e "$alpha_inv is not a natural number! set -a appropriately!"
     exit 1
 fi
-if ! [ "$beta" -gt 0 ] 2> /dev/null; then
-    echo -e "$beta is not a natural number! set -B appropriately!"
+if (( "$(bc -l <<< "$beta < 0")" )); then
+    echo -e "$beta is not greater than 0! set -B appropriately!"
     exit 1
 fi
 if ! [ "$lm_ord" -ge 0 ] 2> /dev/null; then
@@ -146,12 +147,12 @@ if ! [ -f "$exp/config.json" ]; then
 fi
 
 if [ "$lm_ord" = 0 ]; then
-    for part in dev test; do
+    for part in "${dec_partitions[@]}"; do
         if  ! [ -f "$exp/decode/${part}_greedy.trn" ]; then
-            echo "Greedily decoding '$bench/$part'"
+            echo "Greedily decoding '$data/$part'"
             mkdir -p "$exp/decode"
             ./mms.py decode \
-                "$exp" "$bench/$part" "$exp/decode/${part}_greedy.csv_"
+                "$exp" "$data/$part" "$exp/decode/${part}_greedy.csv_"
             mv "$exp/decode/${part}_greedy.csv"{_,}
             ./mms.py metadata-to-trn \
                 "$exp/decode/${part}_greedy."{csv,trn_}
@@ -166,12 +167,12 @@ else
         if $only; then exit 0; fi
     fi
 
-    for part in dev test; do
+    for part in "${dec_partitions[@]}"; do
         if  ! [ -f "$exp/decode/logits/$part/.done" ]; then
-            echo "Dumping logits of '$bench/$part'"
+            echo "Dumping logits of '$data/$part'"
             mkdir -p "$exp/decode/logits/$part"
             ./mms.py decode --logits-dir "$exp/decode/logits/$part" \
-                "$exp" "$bench/$part" "/dev/null"
+                "$exp" "$data/$part" "/dev/null"
             touch "$exp/decode/logits/$part/.done"
             if $only; then exit 0; fi
         fi
@@ -201,7 +202,7 @@ else
         if $only; then exit 0; fi
     fi
 
-    for part in dev test; do
+    for part in "${dec_partitions[@]}"; do
         if ! [ -f "$exp/decode/${part}_${name}.trn" ]; then
             echo "Decoding $part"
             ./prep/logits-to-trn-via-pyctcdecode.py \
@@ -222,7 +223,7 @@ for er in wer cer per; do
     echo "                       ERROR TYPE: $er                              "
     echo "===================================================================="
     echo ""
-    for part in dev test; do
+    for part in "${dec_partitions[@]}"; do
         ./evaluate_asr.sh -d "$data" -e "$exp" -p "$part" -r "$er"
         echo ""
     done
