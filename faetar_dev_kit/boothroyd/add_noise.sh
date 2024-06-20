@@ -1,135 +1,97 @@
 #! /usr/bin/env bash
 
-# Copyright 2023 Sean Robertson
+# Copyright 2024 Sean Robertson, Michael Ong
 # Apache 2.0
 
 echo "$0 $*"
 
-cleanup=true
-cmd=run.pl
+usage="Usage: $0 [-h] [-p TYPE] [-b NAT] [-d DIR] [-o DIR]"
 noise_type=whitenoise
-samp_max=32767
-nj=10
-validate=false
+bit_depth=16
+data_dir=
+snr=
+out_dir=
+help="Adds generated noise to .wav files
 
-. ./path.sh
-. utils/parse_options.sh
+Options
+    -h          Display this help message and exit
+    -n TYPE     The type of noise generated with the sox synth
+                command (default: '$noise_type')
+    -b NAT      The bit depth of the output (default: '$bit_depth')
+    -d DIR      The data directory (default: '$data_dir')
+    -s INT      The signal to noise ratio in dB (default: '$snr')
+    -o DIR      The output directory (default: '$out_dir')"
 
-if [ $# -ne 3 ] && [ $# -ne 4 ]; then
-  echo "Usage: $0 [opts] <src-data> <snr> <dest-data> [<noise-dir>]"
-  echo "e.g. $0 data/dev_clean_norm 0 data/dev_clean_snr_0 mfcc"
-  echo ""
-  echo "snr is in decibels"
-  echo ""
-  echo "Options:"
-  echo "--noise-type TYPE  The type of noise generated with the sox synth"
-  echo "                   command. Defaults to whitenoise"
-  echo "--samp-max NAT  The maximum integer value a sample can take. Used "
-  echo "                to scale values between [-1, 1]. Defaults to 32767 "
-  echo "                (pcm16 max)"
-  echo "--validate (true|false)"
-  echo "                If set, will double-check the resulting wavs' power "
-  echo "                matches reference levels. Default false"
-  echo "--cleanup (true|false)"
-  echo "                Whether to delete temporary files when done. Default "
-  echo "                true"
-  exit 1
-fi
-
-src="$1"
-snr="$2"
-dst="$3"
-ndir="${4:-"$3/noise"}"
-tmpdir="$dst/tmp"
-logdir="$dst/log/add_noise_$snr"
-tsrc="$tmpdir/tsrc"
-
-for x in "$src/wav.scp"; do
-  if [ ! -f "$x" ]; then
-    echo "$0: file '$x' does not exist!"
-    exit 1
-  fi
+while getopts "hn:b:d:s:o:" name; do
+    case $name in
+        h)
+            echo "$usage"
+            echo ""
+            echo "$help"
+            exit 0;;
+        n)
+            noise_type="$OPTARG";;
+        b)
+            bit_depth="$OPTARG";;
+        d)
+            data_dir="$OPTARG";;
+        s)
+            snr="$OPTARG";;
+        o)
+            out_dir="$OPTARG";;
+        *)
+            echo -e "$usage"
+            exit 1;;
+    esac
 done
+shift $(($OPTIND - 1))
+if [ ! -d "$data_dir" ]; then
+    echo -e "'$data_dir' is not a directory! Set -d appropriately!"
+    exit 1
+fi
+if ! mkdir -p "$out_dir" 2> /dev/null; then
+    echo -e "Could not create '$out_dir'! set -o appropriately!"
+    exit 1
+fi
+if ! [ "$(grep -Ew "sine|square|triangle|sawtooth|trapezium|exp|(|white|pink|brown)noise" <<< "$noise_type")" ] 2> /dev/null; then
+    echo -e "$noise_type is not a valid noise type! set -n appropriately!"
+    exit 1
+fi
+if ! [ "$bit_depth" -gt 0 ] 2> /dev/null; then
+    echo -e "$bit_depth is not a natural number! set -b appropriately!"
+    exit 1
+fi
+if ! [[ "$snr" =~ ^-?[0-9]+\.?[0-9]+$ ]] 2> /dev/null; then
+    echo -e "$snr is not a real number! set -s appropriately!"
+    exit 1
+fi
 
 set -eo pipefail
 
-mkdir -p "$tsrc" "$dst" "$ndir"
+mkdir -p "$out_dir/noise"
 
-./utils/data/get_reco2dur.sh "$src"
-max_dur=$(cut -d ' ' -f 2 "$src/reco2dur" | awk -v m=0 '{if ($1 > m) m = $1} END {print m}')
+max_dur=0
 
-nfile="$ndir/$noise_type.$max_dur.wav"
+for file in "$data_dir"/*.wav; do
+  file_dur="$(soxi -D "$file")"
+  max_dur="$(bc -l <<< "if ($file_dur > $max_dur) {$file_dur;} else {$max_dur;}")"
+done
+
+full_noise_file="$out_dir/noise/$noise_type.$max_dur.wav"
+
 # -R flag should keep this file the same, no matter how many times it's
 # called
-sox -R -b 16 -r 16k -n $nfile synth $max_dur $noise_type vol 0.99
+sox -R -b 16 -r 16k -n $full_noise_file synth $max_dur $noise_type
 
-./utils/split_data.sh --per-utt "$src" "$nj"
+for file in "$data_dir"/*.wav; do
+  filename="$(basename "$file")"
+  file_dur="$(soxi -D "$file")"
+  trimmed_noise_rms_amp="$(sox "$full_noise_file" -b "$bit_depth" -n trim 0 "$file_dur" stat 2>&1 | awk '/RMS\s+amplitude:/ {print $3}')"
+  file_rms_amp="$(sox "$file" -n stat 2>&1 | awk '/RMS\s+amplitude:/ {print $3}')"
+  # calculates $file_rms_amp / ((10^($snr / 20)))
+  target_rms_amp="$(bc -l <<< "$file_rms_amp / e(l(10) * ($snr / 20))")"
+  vol_shift="$(bc -l <<< "$target_rms_amp / $trimmed_noise_rms_amp")"
+  out_path="$out_dir/$filename"
 
-for (( n=1; n <= nj; n+=1 )); do
-  ./utils/filter_scp.pl "$src/split${nj}utt/$n/wav.scp" "$src/reco2dur" |
-    awk -v "nfile=$nfile" '{print $1,"sox",nfile, "-t wav - trim 0",$2,"|"}' \
-      > "$tmpdir/noise.wav.$n.scp" &
+  sox -m "$file" -v "$vol_shift" "$full_noise_file" -t wav "$out_path" trim 0 "$file_dur"
 done
-wait
-
-$cmd JOB=1:$nj $logdir/get_noise_power.JOB.log \
-  ./local/get_wav_power.py \
-    --magnitude=true --normalize=true --inv-scale-by "$samp_max" \
-    scp,s,o:$tmpdir/noise.wav.JOB.scp ark,t:$tmpdir/noise_mag.JOB.txt
-
-$cmd JOB=1:$nj $logdir/get_wav_power.JOB.log \
-  ./local/get_wav_power.py \
-    --magnitude=true  --normalize=true --inv-scale-by "$samp_max" \
-    scp,s,o:$src/split${nj}utt/JOB/wav.scp ark,t:$tmpdir/sig_mag.JOB.txt
-
-for (( n=1; n <= nj; n+= 1)); do
-  # vol=sqrt(sigpow/(10 ** (SNR / 10) * noisepow))
-  paste -d ' ' "$tmpdir/"{sig,noise}_mag.$n.txt |
-    awk -v "snr=$snr" '
-BEGIN {snrmag=exp(log(10) * (snr / 20))}
-{print $1,$2 / ($4 * snrmag)}
-' > "$tmpdir/noise_vol.$n.txt" &
-done
-wait
-
-if $validate; then
-  for (( n=1; n <= nj; n+=1 )); do
-    paste -d ' ' "$tmpdir/noise.wav.$n.scp" "$tmpdir/noise_vol.$n.txt" |
-      awk '{vol=$NF; NF -=2; print $0,"sox -v",vol,"- -t wav - |"}' |
-      ./local/get_wav_power.py \
-        --normalize=true --inv-scale-by "$samp_max" "scp:-" "ark:-" 2> /dev/null |
-    python -c "snr=$snr; sig_pow='ark,s:$tmpdir/sig_mag.$n.txt';"'
-from pydrobert.kaldi.io import open
-import numpy as np
-utt2sigmag = open(sig_pow, "b", "r+")
-f = open("ark:-", "b")
-for utt, noisepow in f.items():
-  sigpow = utt2sigmag[utt] ** 2
-  act = 10 * (np.log10(sigpow) - np.log10(noisepow))
-  assert np.isclose(act, snr, rtol=1e-3), (
-    f"{utt}: exp={snr}, act={act}, sigpow={sigpow}, noisepow={noisepow}"
-  )
-'
-  done
-fi
-
-echo "Copying"
-
-./utils/copy_data_dir.sh "$src" "$tsrc"
-rm -f "$tsrc/"{feats.scp,cmvn.scp}
-
-for (( n=1; n <= nj; n+=1 )); do
-  ./utils/filter_scp.pl "$src/split${nj}utt/$n/wav.scp" "$src/reco2dur" |
-    paste -d ' ' "$tmpdir/noise_vol.$n.txt" - |
-    awk -v nfile=$nfile \
-      '{print "sox -m - -v",$2,nfile,"-t wav - trim 0",$4,"|"}' |
-    paste -d ' ' "$src/split${nj}utt/$n/wav.scp" -
-done | sort -k 1,1 -u > "$tsrc/wav.scp"
-
-if $validate; then
-  ./utils/validate_data_dir.sh --no-feats "$tsrc"
-fi
-
-cp "$tsrc"/* "$dst"
-
-! $cleanup || rm -rf "$tmpdir"
