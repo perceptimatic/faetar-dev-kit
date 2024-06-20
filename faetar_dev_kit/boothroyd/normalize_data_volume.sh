@@ -6,7 +6,7 @@
 echo "$0 $*"
 
 usage="Usage: $0 [-h] [-p NINT] [-l NAT] [-b NAT] [-d DIR] [-o DIR]"
-pref="-5"
+pref=0.00001
 l0=70
 bit_depth=16
 data_dir=
@@ -15,7 +15,7 @@ help="Normalize volume of .wav files to a given reference amplitude + dB level
 
 Options
     -h          Display this help message and exit
-    -p NINT     The reference amplitude log 10 (default: '$pref')
+    -p FLOAT    The reference amplitude (default: '$pref')
     -l NAT      The reference level (dB) (default: '$l0')
     -b NAT      The bit depth of the output (default: '$bit_depth')
     -d DIR      The data directory (default: '$data_dir')
@@ -52,8 +52,8 @@ if ! mkdir -p "$out_dir" 2> /dev/null; then
     echo -e "Could not create '$out_dir'! set -o appropriately!"
     exit 1
 fi
-if ! [ "$pref" -lt 0 ] 2> /dev/null; then
-    echo -e "$pref is not a negative integer! set -p appropriately!"
+if ! [[ "$pref" =~ ^-?[0-9]+\.?[0-9]+$ ]] 2> /dev/null; then
+    echo -e "$pref is not a real number! set -p appropriately!"
     exit 1
 fi
 if ! [ "$l0" -gt 0 ] 2> /dev/null; then
@@ -73,8 +73,8 @@ for file in "$data_dir"/*.wav; do
   filename="$(basename "$file")"
   dc_shift="$(sox "$file" -n stat 2>&1 | awk '/Mean\s+amplitude:/ {print -$3}')"
   file_rms_amp="$(sox "$file" -n dcshift "$dc_shift" stat 2>&1 | awk '/RMS\s+amplitude:/ {print $3}')"
-  # calculates 10^$pref * 10^($l0/20)
-  target_rms_amp="$(bc -l <<< "e(l(10) * ($pref + ($l0 / 20)))")"
+  # calculates $pref * 10^($l0/20)
+  target_rms_amp="$(bc -l <<< "$pref * e(l(10) * ($l0 / 20))")"
   vol_shift="$(bc -l <<< "$target_rms_amp / $file_rms_amp")"
   # sets mean amplitude to 0 
   # and sets rms amplitude to the value corresponding to l0 dB above the reference amplitude 10^$pref
