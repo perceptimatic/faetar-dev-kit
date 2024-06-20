@@ -61,8 +61,8 @@ if ! [ "$bit_depth" -gt 0 ] 2> /dev/null; then
     echo -e "$bit_depth is not a natural number! set -b appropriately!"
     exit 1
 fi
-if ! [[ "$snr" =~ ^-?[0-9]+\.?[0-9]+$ ]] 2> /dev/null; then
-    echo -e "$snr is not a real number! set -s appropriately!"
+if ! [[ "$snr" =~ ^-?[0-9]+\.?[0-9]*$ ]] 2> /dev/null; then
+    echo -e "$snr is not a real number! set -s appropriately, or add a leading zero!"
     exit 1
 fi
 

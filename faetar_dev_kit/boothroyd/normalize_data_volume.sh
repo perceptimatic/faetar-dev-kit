@@ -52,8 +52,8 @@ if ! mkdir -p "$out_dir" 2> /dev/null; then
     echo -e "Could not create '$out_dir'! set -o appropriately!"
     exit 1
 fi
-if ! [[ "$pref" =~ ^-?[0-9]+\.?[0-9]+$ ]] 2> /dev/null; then
-    echo -e "$pref is not a real number! set -p appropriately!"
+if ! [[ "$pref" =~ ^-?[0-9]+\.?[0-9]*$ ]] 2> /dev/null; then
+    echo -e "$pref is not a real number! set -p appropriately, or add a leading zero!"
     exit 1
 fi
 if ! [ "$l0" -gt 0 ] 2> /dev/null; then
