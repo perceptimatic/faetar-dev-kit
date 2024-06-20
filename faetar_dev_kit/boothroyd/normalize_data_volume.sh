@@ -1,100 +1,83 @@
 #! /usr/bin/env bash
 
-# Copyright 2023 Sean Robertson
+# Copyright 2024 Sean Robertson, Michael Ong
 # Apache 2.0
 
 echo "$0 $*"
 
-pref="0.00001"
+usage="Usage: $0 [-h] [-p NINT] [-l NAT] [-b NAT] [-d DIR] [-o DIR]"
+pref="-5"
 l0=70
-samp_max=32767
-cleanup=true
-nj=10
-cmd=run.pl
+bit_depth=16
+data_dir=
+out_dir=
+help="Normalize volume of .wav files to a given reference amplitude + dB level
 
-. ./path.sh
-. utils/parse_options.sh
+Options
+    -h          Display this help message and exit
+    -p NINT     The reference amplitude log 10 (default: '$pref')
+    -l NAT      The reference level (dB) (default: '$l0')
+    -b NAT      The bit depth of the output (default: '$bit_depth')
+    -d DIR      The data directory (default: '$data_dir')
+    -o DIR      The output directory (default: '$out_dir')"
 
-if [ $# -ne 2 ]; then
-  echo "Usage: $0 [opts] <src-data> <dest-data>"
-  echo "e.g. $0 data/dev_clean data/dev_clean_norm"
-  echo ""
-  echo "Options:"
-  echo "--pref FLOAT    The reference amplitude. Default 0.00001"
-  echo "--l0 FLOAT      The reference level (dB). Defaults to 70"
-  echo "--samp-max NAT  The maximum integer value a sample can take. Used "
-  echo "                to scale values between [-1, 1]. Defaults to 32767 "
-  echo "                (pcm16 max)"
-  echo "--cleanup (true|false)"
-  echo "                Whether to delete temporary files when done. Default "
-  echo "                true"
-  exit 1
-fi
-
-src="$1"
-dst="$2"
-tmpdir="$dst/tmp"
-logdir="$dst/log/normalize_data_volume"
-tsrc="$tmpdir/tsrc"
-
-for x in "$src/wav.scp"; do
-  if [ ! -f "$x" ]; then
-    echo "$0: file '$x' does not exist!"
-    exit 1
-  fi
+while getopts "hp:l:b:d:o:" name; do
+    case $name in
+        h)
+            echo "$usage"
+            echo ""
+            echo "$help"
+            exit 0;;
+        p)
+            pref="$OPTARG";;
+        l)
+            l0="$OPTARG";;
+        b)
+            bit_depth="$OPTARG";;
+        d)
+            data_dir="$OPTARG";;
+        o)
+            out_dir="$OPTARG";;
+        *)
+            echo -e "$usage"
+            exit 1;;
+    esac
 done
+shift $(($OPTIND - 1))
+if [ ! -d "$data_dir" ]; then
+    echo -e "'$data_dir' is not a directory! Set -d appropriately!"
+    exit 1
+fi
+if ! mkdir -p "$out_dir" 2> /dev/null; then
+    echo -e "Could not create '$out_dir'! set -o appropriately!"
+    exit 1
+fi
+if ! [ "$pref" -lt 0 ] 2> /dev/null; then
+    echo -e "$pref is not a negative integer! set -p appropriately!"
+    exit 1
+fi
+if ! [ "$l0" -gt 0 ] 2> /dev/null; then
+    echo -e "$l0 is not a natural number! set -l appropriately!"
+    exit 1
+fi
+if ! [ "$bit_depth" -gt 0 ] 2> /dev/null; then
+    echo -e "$bit_depth is not a natural number! set -b appropriately!"
+    exit 1
+fi
 
 set -e
 
-mkdir -p "$tsrc" "$logdir" "$dst"
+mkdir -p "$out_dir"
 
-./utils/split_data.sh --per-utt "$src" "$nj"
-
-$cmd JOB=1:$nj $logdir/get_wav_dc.JOB.log \
-  ./local/get_wav_dc.py --inv-scale-by "$samp_max" \
-  "scp,s,o:$src/split${nj}utt/JOB/wav.scp" "ark,t:$tmpdir/dc.JOB.txt"
-
-for (( n=1; n <= nj; n+= 1 )); do
-  awk '{print "sox - -t wav - dcshift",-$2,"|"}' "$tmpdir/dc.$n.txt" |
-    paste -d ' ' $src/split${nj}utt/$n/wav.scp - > "$tmpdir/wav.offset.$n.scp" &
+for file in "$data_dir"/*.wav; do
+  filename="$(basename "$file")"
+  dc_shift="$(sox "$file" -n stat 2>&1 | awk '/Mean\s+amplitude:/ {print -$3}')"
+  file_rms_amp="$(sox "$file" -n dcshift "$dc_shift" stat 2>&1 | awk '/RMS\s+amplitude:/ {print $3}')"
+  # calculates 10^$pref * 10^($l0/20)
+  target_rms_amp="$(bc -l <<< "e(l(10) * ($pref + ($l0 / 20)))")"
+  vol_shift="$(bc -l <<< "$target_rms_amp / $file_rms_amp")"
+  # sets mean amplitude to 0 
+  # and sets rms amplitude to the value corresponding to l0 dB above the reference amplitude 10^$pref
+  # by default this causes the output rms amplitude to be 0.0316227766 / 10^(-3/2)
+  sox "$file" -b "$bit_depth" "$out_dir"/"$filename" dcshift "$dc_shift" vol "$vol_shift"
 done
-wait
-
-$cmd JOB=1:$nj $logdir/get_wav_power.JOB.log \
-  ./local/get_wav_power.py \
-    --magnitude=true --normalize=true --inv-scale-by "$samp_max" \
-    scp,s,o:$tmpdir/wav.offset.JOB.scp ark,t:$tmpdir/mag.JOB.txt
-
-# copy the data directory over to tsrc. This makes it easier to copy
-# only the relevant files to dir
-./utils/copy_data_dir.sh "$src" "$tsrc"
-rm -f "$tsrc/"{feats.scp,cmvn.scp}
-
-
-for (( n=1; n <= nj; n+= 1 )); do
-  paste -d ' ' $tmpdir/{dc,mag}.$n.txt |
-    awk -v "pref=$pref" -v "l0=$l0" '
-BEGIN {coeff=pref * exp(log(10) * l0 / 20)}
-{print "sox - -t wav - dcshift",-$2,"vol",coeff / $4,"|"}' |
-    paste -d ' ' $src/split${nj}utt/$n/wav.scp -
-done | sort -k 1,1 -u > "$tsrc/wav.scp"
-
-if $validate; then
-  ./utils/validate_data_dir.sh --no-feats "$tsrc"
-  
-  ./local/get_wav_power.py \
-      --normalize=true --inv-scale-by \
-      "$samp_max" "scp,s,o:$tsrc/wav.scp" "ark:-" 2> /dev/null |
-    python -c "l0=$l0;pref=$pref;"'
-from pydrobert.kaldi.io import open
-import numpy as np
-exp = 10 ** (l0 / 10) * (pref ** 2)
-f = open("ark:-", "b")
-for utt, act in f.items():
-  assert np.isclose(exp, act, rtol=1e-3), f"{utt}: exp={exp}, act={act}"
-'
-fi
-
-cp "$tsrc"/* "$dst"
-
-! $cleanup || rm -rf "$tmpdir"
