@@ -3,192 +3,133 @@
 # Copyright 2023 Sean Robertson
 # Apache 2.0
 
-conf=conf      # configuration directory
-exp=exp        # experiment directory
-data=data      # data directory
-latlm=tgsmall  # which lm to use to generate lattices
-reslm=tgsmall  # which lm to use for lattice rescoring
-mdl=chain_cleaned/tdnn_1d_sp      # which model to decode with
-ivecmdl=nnet3_cleaned/extractor  # ivector extractor (tdnn mdl only)
-part=dev_clean # partition to perform 
-snr_low=-10      # lower bound (inclusive) of signal-to-noise ratio (SNR)
-snr_high=30      # upper bound (inclusive) of signal-to-noise ratio (SNR)
-pretrained_store=/ais/hal9000/sdrobert/librispeech_models  # where pretrained models are downloaded to
-pretrained_url=https://kaldi-asr.org/models/13  # where to download pretrained models from
-use_gpu=true
+echo "$0 $*"
 
-. ./cmd.sh
+cleanup=true
+cmd=run.pl
+noise_type=whitenoise
+samp_max=32767
+nj=10
+validate=false
+
 . ./path.sh
 . utils/parse_options.sh
 
-declare -A MNAME2PNAME=(
-  ["rnnlm_lstm_1a"]="0013_librispeech_v1_lm"
-  ["chain_cleaned/tdnn_1d_sp"]="0013_librispeech_v1_chain"
-  ["nnet3_cleaned/extractor"]="0013_librispeech_v1_extractor"
-)
-
-set -e
-
-mdldir="$exp/$mdl"
-graphdir="$mdldir/graph_$latlm"
-
-if [[ "$mdl" =~ tdnn ]]; then
-  mfcc_suffix=_hires
-  self_loop_args="--self-loop-scale 1.0"
-else
-  mfcc_suffix=
-  ivecmdl=
-  self_loop_args=
+if [ $# -ne 3 ] && [ $# -ne 4 ]; then
+  echo "Usage: $0 [opts] <src-data> <snr> <dest-data> [<noise-dir>]"
+  echo "e.g. $0 data/dev_clean_norm 0 data/dev_clean_snr_0 mfcc"
+  echo ""
+  echo "snr is in decibels"
+  echo ""
+  echo "Options:"
+  echo "--noise-type TYPE  The type of noise generated with the sox synth"
+  echo "                   command. Defaults to whitenoise"
+  echo "--samp-max NAT  The maximum integer value a sample can take. Used "
+  echo "                to scale values between [-1, 1]. Defaults to 32767 "
+  echo "                (pcm16 max)"
+  echo "--validate (true|false)"
+  echo "                If set, will double-check the resulting wavs' power "
+  echo "                matches reference levels. Default false"
+  echo "--cleanup (true|false)"
+  echo "                Whether to delete temporary files when done. Default "
+  echo "                true"
+  exit 1
 fi
 
-for mname in "$mdl" "$reslm" ${ivecmdl:+"$ivecmdl"}; do
-  pname="${MNAME2PNAME[$mname]}"
-  if [ ! -z "$pname" ] && [ ! -f "$exp/$mname/.downloaded" ]; then
-    echo "$0: $mname corresponds to pretrained model $pname. Downloading and extracting"
-    mkdir -p "$pretrained_store" "$exp/$mname"
-    ./local/download_pretrained_models.sh \
-      "$pretrained_store" "$pretrained_url" "$pname"
-    cp -r "$pretrained_store/exp/$mname/"* "$exp/$mname"
-    touch "$exp/$mname/.downloaded"
-  fi
-done
+src="$1"
+snr="$2"
+dst="$3"
+ndir="${4:-"$3/noise"}"
+tmpdir="$dst/tmp"
+logdir="$dst/log/add_noise_$snr"
+tsrc="$tmpdir/tsrc"
 
-if [[ ! "$mdl" =~ facebook ]]; then
-  needed_files+=( $exp/$mdl/final.mdl $data/lang_test_$latlm/G.fst )
-  if [ ! "$reslm" = "$latlm" ]; then
-    if [[ "$reslm" =~ rnnlm ]]; then
-      needed_files+=( "$exp/$reslm/final.raw" )
-    else
-      if [ ! -f "$data/lang_test_$reslm/G.fst" ]; then 
-        needed_files+=( "$data/lang_test_$reslm/G.carpa" )
-      fi
-    fi
-  fi
-fi
-for x in "${needed_files[@]}"; do
+for x in "$src/wav.scp"; do
   if [ ! -f "$x" ]; then
-    echo "$0: '$x' is not a file!"
+    echo "$0: file '$x' does not exist!"
     exit 1
   fi
 done
 
-if [[ "$mdl" =~ facebook ]]; then
-  graphdir=data/lang
-else
-  if [ ! -f "$graphdir/HCLG.fst" ]; then
-    utils/mkgraph.sh $self_loop_args \
-      "$data/lang_test_$latlm" "$mdldir" "$graphdir"
-  fi
+set -eo pipefail
+
+mkdir -p "$tsrc" "$dst" "$ndir"
+
+./utils/data/get_reco2dur.sh "$src"
+max_dur=$(cut -d ' ' -f 2 "$src/reco2dur" | awk -v m=0 '{if ($1 > m) m = $1} END {print m}')
+
+nfile="$ndir/$noise_type.$max_dur.wav"
+# -R flag should keep this file the same, no matter how many times it's
+# called
+sox -R -b 16 -r 16k -n $nfile synth $max_dur $noise_type vol 0.99
+
+./utils/split_data.sh --per-utt "$src" "$nj"
+
+for (( n=1; n <= nj; n+=1 )); do
+  ./utils/filter_scp.pl "$src/split${nj}utt/$n/wav.scp" "$src/reco2dur" |
+    awk -v "nfile=$nfile" '{print $1,"sox",nfile, "-t wav - trim 0",$2,"|"}' \
+      > "$tmpdir/noise.wav.$n.scp" &
+done
+wait
+
+$cmd JOB=1:$nj $logdir/get_noise_power.JOB.log \
+  ./local/get_wav_power.py \
+    --magnitude=true --normalize=true --inv-scale-by "$samp_max" \
+    scp,s,o:$tmpdir/noise.wav.JOB.scp ark,t:$tmpdir/noise_mag.JOB.txt
+
+$cmd JOB=1:$nj $logdir/get_wav_power.JOB.log \
+  ./local/get_wav_power.py \
+    --magnitude=true  --normalize=true --inv-scale-by "$samp_max" \
+    scp,s,o:$src/split${nj}utt/JOB/wav.scp ark,t:$tmpdir/sig_mag.JOB.txt
+
+for (( n=1; n <= nj; n+= 1)); do
+  # vol=sqrt(sigpow/(10 ** (SNR / 10) * noisepow))
+  paste -d ' ' "$tmpdir/"{sig,noise}_mag.$n.txt |
+    awk -v "snr=$snr" '
+BEGIN {snrmag=exp(log(10) * (snr / 20))}
+{print $1,$2 / ($4 * snrmag)}
+' > "$tmpdir/noise_vol.$n.txt" &
+done
+wait
+
+if $validate; then
+  for (( n=1; n <= nj; n+=1 )); do
+    paste -d ' ' "$tmpdir/noise.wav.$n.scp" "$tmpdir/noise_vol.$n.txt" |
+      awk '{vol=$NF; NF -=2; print $0,"sox -v",vol,"- -t wav - |"}' |
+      ./local/get_wav_power.py \
+        --normalize=true --inv-scale-by "$samp_max" "scp:-" "ark:-" 2> /dev/null |
+    python -c "snr=$snr; sig_pow='ark,s:$tmpdir/sig_mag.$n.txt';"'
+from pydrobert.kaldi.io import open
+import numpy as np
+utt2sigmag = open(sig_pow, "b", "r+")
+f = open("ark:-", "b")
+for utt, noisepow in f.items():
+  sigpow = utt2sigmag[utt] ** 2
+  act = 10 * (np.log10(sigpow) - np.log10(noisepow))
+  assert np.isclose(act, snr, rtol=1e-3), (
+    f"{utt}: exp={snr}, act={act}, sigpow={sigpow}, noisepow={noisepow}"
+  )
+'
+  done
 fi
 
-npart="${part}${mfcc_suffix}/norm"
-parts=( $npart )
+echo "Copying"
 
-# Normalize data volume to same reference average RMS
-if [ ! -f "$data/$npart/.complete" ]; then
-  ./local/normalize_data_volume.sh "$data/$part" "$data/$npart"
-  ./steps/make_mfcc.sh \
-    --mfcc-config "$conf/mfcc${mfcc_suffix}.conf" --cmd "$train_cmd" --nj 40 \
-    $data/$npart $exp/make_mfcc/$npart
-  utils/fix_data_dir.sh $data/$npart
-  steps/compute_cmvn_stats.sh $data/$npart $exp/make_mfcc/$npart
-  touch "$data/$npart/.complete"
+./utils/copy_data_dir.sh "$src" "$tsrc"
+rm -f "$tsrc/"{feats.scp,cmvn.scp}
+
+for (( n=1; n <= nj; n+=1 )); do
+  ./utils/filter_scp.pl "$src/split${nj}utt/$n/wav.scp" "$src/reco2dur" |
+    paste -d ' ' "$tmpdir/noise_vol.$n.txt" - |
+    awk -v nfile=$nfile \
+      '{print "sox -m - -v",$2,nfile,"-t wav - trim 0",$4,"|"}' |
+    paste -d ' ' "$src/split${nj}utt/$n/wav.scp" -
+done | sort -k 1,1 -u > "$tsrc/wav.scp"
+
+if $validate; then
+  ./utils/validate_data_dir.sh --no-feats "$tsrc"
 fi
 
-for snr in $(seq $snr_low $snr_high); do
-  spart="${part}${mfcc_suffix}/snr$snr"
-  if [ ! -f "$data/$spart/.complete" ]; then
-    # add noise at specific SNR, then compute feats + cmvn
-    ./local/add_noise.sh $data/$npart $snr $data/$spart
-    ./steps/make_mfcc.sh --mfcc-config "$conf/mfcc${mfcc_suffix}.conf" \
-      --cmd "$train_cmd" --nj 40 \
-      $data/$spart $exp/make_mfcc/$spart
-    utils/fix_data_dir.sh $data/$spart
-    steps/compute_cmvn_stats.sh $data/$spart $exp/make_mfcc/$spart
-    touch "$data/$spart/.complete"
-  fi
-  parts+=( $spart )
-done
+cp "$tsrc"/* "$dst"
 
-for spart in "${parts[@]}"; do
-  partdir="$data/$spart"
-  if [[ "$mdl" =~ facebook ]]; then
-    decodedir="$mdldir/decode_null_$spart"
-    if [ ! -f "$decodedir/.complete" ]; then
-      ./local/decode_transformer.sh "$graphdir" "$partdir" "$mdl" "$decodedir"
-      touch "$decodedir/.complete"
-    fi
-  else  # not facebook
-    latdecodedir="$mdldir/decode_${latlm}_$spart"
-    if [[ "$reslm" = "$latlm" ]]; then
-      decodedir="$latdecodedir"
-    else
-      decodedir="$mdldir/decode_${latlm}_rescore_${reslm}_$spart"
-    fi
-
-    # ivectors for tdnn
-    if [[ "$mdl" =~ tdnn ]] && [ ! -f "$exp/$ivecmdl/ivectors_${spart}/.complete" ]; then
-      steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj 10 \
-        "$data/$spart" "$exp/$ivecmdl" "$exp/$ivecmdl/ivectors_${spart}"
-      touch "$exp/$ivecmdl/ivectors_${spart}/.complete"
-    fi
-
-    # decode the entire partition in the usual way using the lattice lm
-    if [ ! -f "$latdecodedir/.complete" ]; then
-      rm -rf "$latdecodedir"
-      mkdir -p "$(dirname "$latdecodedir")"
-      tmplatdecodedir="$exp/$mdl/tmp_decode"
-      if [[ "$mdl" =~ tdnn ]]; then
-        steps/nnet3/decode.sh --acwt 1.0 --post-decode-acwt 10.0 \
-          --use-gpu $use_gpu \
-          --nj 10 --cmd "$decode_cmd" \
-          --online-ivector-dir "$exp/$ivecmdl/ivectors_${spart}" \
-          "$graphdir" "$partdir" "$tmplatdecodedir"
-      else
-        steps/decode_fmllr.sh --nj 10 --cmd "$decode_cmd" \
-          "$graphdir" "$partdir" "$tmplatdecodedir"
-      fi
-      mv "$tmplatdecodedir" "$latdecodedir"
-      touch "$latdecodedir/.complete"
-    fi
-
-    # now rescore with the intended lm
-    if [ ! -f "$decodedir/.complete" ]; then
-      if [[ "$reslm" =~ rnnlm ]]; then
-        # from libri_css/s5_css/run.sh
-        rnnlm/lmrescore_pruned.sh \
-          --cmd "$decode_cmd" \
-          "$data/lang_test_$latlm" "$exp/$reslm" "$partdir" "$latdecodedir" \
-          "$decodedir"
-      else
-        if [ -f "$data/lang_test_$reslm/G.fst" ]; then
-            tmplatdecodedir="$exp/$mdl/tmp_decode"
-            rm -rf "$tmplatdecodedir"
-            cp -rf "$latdecodedir" "$tmplatdecodedir"
-            steps/lmrescore.sh $self_loop_args --cmd "$decode_cmd" \
-              "$data/"lang_test_{$latlm,$reslm} "$partdir" "$tmplatdecodedir" \
-              "$decodedir"
-            rm -rf "$tmplatdecodedir"
-        else
-          steps/lmrescore_const_arpa.sh --cmd "$decode_cmd" \
-            $data/lang_test_{$latlm,$reslm} "$partdir" "$latdecodedir" \
-            "$decodedir"
-        fi
-      fi
-      touch "$decodedir/.complete"
-    fi
-  fi
-
-  if [ ! -f "$decodedir/wer_best" ]; then
-    grep -H WER "$decodedir/"wer* | utils/best_wer.sh > "$decodedir/wer_best"
-  fi
-
-  if [ ! -f "$decodedir/uttwer_best" ]; then
-    ./local/wer_per_utt.sh "$graphdir" "$decodedir/scoring"
-    best_uttwer="$(awk '{gsub(/.*wer_/, "", $NF); gsub("_", ".", $NF);  print "scoring/"$NF".uttwer"}' "$decodedir/wer_best")"
-    ln -sf "$best_uttwer" "$decodedir/uttwer_best"
-    [ -f "$decodedir/uttwer_best" ] || exit 1
-  fi
-done
-
-find "$exp/" -type f -name 'wer_best' -exec cat {} \;
+! $cleanup || rm -rf "$tmpdir"
