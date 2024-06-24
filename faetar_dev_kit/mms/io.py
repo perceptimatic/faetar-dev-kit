@@ -45,7 +45,10 @@ def compile_metadata(options: Options):
                     file=sys.stderr,
                 )
                 return 1
-            entries.append(txt.read_text().strip())
+            if txt.read_text().strip() == "nan":
+                entries.append(" " + txt.read_text().strip())
+            else:
+                entries.append(txt.read_text().strip())
         fp.write(",".join(entries))
         fp.write("\n")
 
