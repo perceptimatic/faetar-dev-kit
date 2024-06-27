@@ -17,9 +17,9 @@
 export PYTHONUTF8=1
 [ -f "path.sh" ] && . "path.sh"
 
-usage="Usage: $0 [-h] [-o] [-e DIR] [-b DIR] [-d DIR] [-w NAT] [-a NAT] [-B NAT] [-l NNINT]"
+usage="Usage: $0 [-h] [-o] [-e DIR] [-b DIR] [-d DIR] [-w NAT] [-a NAT] [-B NAT] [-l NNINT] [-s NAT]"
 only=false
-exp=exp/mms_lsah
+exp=exp/mms_lsah_q
 data=data/mms_lsah
 width=100
 alpha_inv=1
@@ -28,6 +28,7 @@ lm_ord=0
 training_kwargs=conf/mms_lsah/training_kwargs.json
 wav2vec2_kwargs=conf/mms_lsah/wav2vec2_kwargs.json
 dec_partitions=(train dev test)
+bootstrap_samples=0
 help="Train and decode with the mms-lsah baseline
 
 Options
@@ -40,9 +41,10 @@ Options
     -w NAT      pyctcdecode's beam width (default: $width)
     -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
     -B NAT      pyctcdecode's beta (default: $beta)
-    -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)"
+    -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)
+    -s NAT    Bootstrap samples. 0 is no bootstrap (default: $bootstrap_samples)"
 
-while getopts "hoe:d:c:C:w:a:B:l:" name; do
+while getopts "hoe:d:c:C:w:a:B:l:s:" name; do
     case $name in
         h)
             echo "$usage"
@@ -67,6 +69,8 @@ while getopts "hoe:d:c:C:w:a:B:l:" name; do
             beta="$OPTARG";;
         l)
             lm_ord="$OPTARG";;
+        s)
+            bootstrap_samples="$OPTARG";;
         *)
             echo -e "$usage"
             exit 1;;
@@ -107,6 +111,10 @@ if ! [ "$lm_ord" -ge 0 ] 2> /dev/null; then
     echo -e "$lm_ord is not a non-negative int! set -l appropriately!"
     exit 1
 fi
+if ! [ "$bootstrap_samples" -ge 0 ] 2> /dev/null; then
+    echo -e "$bootstrap_samples is not a non-negative int! set -n appropriately!"
+    exit 1
+fi
 
 set -eo pipefail
 
@@ -115,7 +123,7 @@ if [ ! -f "prep/ngram_lm.py" ]; then
     git submodule update --init --remote prep
 fi
 
-for part in train dev test; do
+for part in train dev test train_w_unlab; do
     if ! [ -f "$data/$part/metadata.csv" ]; then
         echo "Creating metadata.csv in '$data/$part'"
         mkdir -p "$data/$part"
@@ -136,13 +144,13 @@ done
 
 if ! [ -f "$exp/vocab.json" ]; then
     echo "Creating $exp/vocab.json"
-    ./mms.py write-vocab "$data/train/metadata.csv" "$exp/vocab.json"
+    ./mms.py write-vocab "$data/train_w_unlab/metadata.csv" "$exp/vocab.json"
     if $only; then exit 0; fi
 fi
 
 if ! [ -f "$exp/config.json" ]; then
     echo "Training model and writing to '$exp'"
-    ./mms.py train "$exp/vocab.json" "$data/"{train,dev} "$exp"
+    ./mms.py train "$exp/vocab.json" "$data/"{train_w_unlab,dev} "$exp"
     if $only; then exit 0; fi
 fi
 
@@ -224,7 +232,7 @@ for er in wer cer per; do
     echo "===================================================================="
     echo ""
     for part in "${dec_partitions[@]}"; do
-        ./evaluate_asr.sh -d "$data" -e "$exp" -p "$part" -r "$er"
+        ./evaluate_asr.sh -d "$data" -e "$exp" -p "$part" -r "$er" -n "$bootstrap_samples"
         echo ""
     done
 done
