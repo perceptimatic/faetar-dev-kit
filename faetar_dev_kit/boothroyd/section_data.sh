@@ -58,7 +58,7 @@ NR == FNR {
     cut = 0.05;
 
     for (i = 1; i <= ns; i++) {
-        out_ref_path = out_dir "/" i "_ref_" filename
+        out_ref_path = out_dir "/" i "_ref.trn"
         if ((NR >= (lines * cut)) && (NR <= (lines * (1 - cut)))) {
             if ((NR > ((lines * (1 - 2 * cut)) * ((i - 1) / ns) + (lines * cut))) && (NR <= ((lines * (1 - 2 * cut)) * (i / ns) + (lines * cut)))) {
                 print $4 "\t" $2, $3 > out_ref_path;
@@ -71,7 +71,7 @@ NR == FNR {
 
 NR != FNR {
     for (i = 1; i <= ns; i++) {
-        out_hyp_path = out_dir "/" i "_hyp_" filename
+        out_hyp_path = out_dir "/" i "_hyp.trn"
         for (ind_name in extract) {
             if (ind_name == FNR "_" i) {
                 print $0 > out_hyp_path;
@@ -85,11 +85,11 @@ NR != FNR {
     }
 }' "-" "$hyp_trn"
 
-for file in "$out_dir"/*_hyp_*; do
+for file in "$out_dir"/*_hyp.trn; do
     split_text "$file" 
 done
 
-for file in "$out_dir"/*_ref_*; do
+for file in "$out_dir"/*_ref.trn; do
     sort -nk 1,1 "$file" |
     awk 'BEGIN {FS = "\t"} {print $2}' > "$file"_
     mv "$file"{_,}
