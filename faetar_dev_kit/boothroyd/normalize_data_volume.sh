@@ -71,13 +71,13 @@ mkdir -p "$out_dir"
 
 for file in "$data_dir"/*.wav; do
   filename="$(basename "$file")"
-  dc_shift="$(sox "$file" -n stat 2>&1 | awk '/Mean\s+amplitude:/ {print -$3}')"
-  file_rms_amp="$(sox "$file" -n dcshift "$dc_shift" stat 2>&1 | awk '/RMS\s+amplitude:/ {print $3}')"
+  file_rms_amp="$(sox "$file" -n stat 2>&1 | awk '/RMS\s+amplitude:/ {print $3}')"
   # calculates $pref * 10^($l0/20)
   target_rms_amp="$(bc -l <<< "$pref * e(l(10) * ($l0 / 20))")"
   vol_shift="$(bc -l <<< "$target_rms_amp / $file_rms_amp")"
+  dc_shift="$(sox "$file" -n vol "$vol_shift" stat 2>&1 | awk '/Mean\s+amplitude:/ {print -$3}')"
   # sets mean amplitude to 0 
   # and sets rms amplitude to the value corresponding to l0 dB above the reference amplitude 10^$pref
   # by default this causes the output rms amplitude to be 0.0316227766 / 10^(-3/2)
-  sox "$file" -b "$bit_depth" "$out_dir"/"$filename" dcshift "$dc_shift" vol "$vol_shift"
+  sox "$file" -b "$bit_depth" "$out_dir"/"$filename" vol "$vol_shift" dcshift "$dc_shift"
 done
