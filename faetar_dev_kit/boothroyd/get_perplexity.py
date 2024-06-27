@@ -6,15 +6,10 @@ import sys
 
 lm_file_path = sys.argv[1]
 trn_file = sys.argv[2]
-out_folder = sys.argv[3]
-partition = sys.argv[4]
 
 model = kenlm.Model(lm_file_path)
 
-if not os.path.exists(f"{out_folder}/{partition}"):
-    os.makedirs(f"{out_folder}/{partition}")
-
-out_path = f"{out_folder}/{partition}/perplexity_{os.path.basename(lm_file_path)}"
+out_path = f"{os.path.dirname(trn_file)}/perplexity_{os.path.basename(lm_file_path)}"
 out = open(out_path, "w")
 
 with open(trn_file, "r") as f:
