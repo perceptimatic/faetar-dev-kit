@@ -72,7 +72,7 @@ def main(args=None):
         "ref_zp_file", type=argparse.FileType("r"), help="The reference zp trn file"
     )
     parser.add_argument(
-        "hyp_zp_file", type=argparse.FileType("r"), help="The hypothesis trn file",
+        "hyp_zp_file", type=argparse.FileType("r"), help="The hypothesis zp trn file",
     )
     options = parser.parse_args(args)
 

@@ -42,7 +42,7 @@ Options
     -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
     -B NAT      pyctcdecode's beta (default: $beta)
     -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)
-    -s NAT    Bootstrap samples. 0 is no bootstrap (default: $bootstrap_samples)"
+    -s NAT      Bootstrap samples. 0 is no bootstrap (default: $bootstrap_samples)"
 
 while getopts "hoe:d:c:C:w:a:B:l:s:" name; do
     case $name in
