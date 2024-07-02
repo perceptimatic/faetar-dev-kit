@@ -17,7 +17,7 @@ point_snr=
 model=exp/mms_lsah_q
 data=
 perplexity_lm=
-partitions=(unlab_test)          # partitions to perform
+partitions=(dev)          # partitions to perform
 out_dir=data/boothroyd
 norm_wavs_out_dir=norm
 noise_wavs_out_dir=noise
@@ -286,10 +286,7 @@ for part in "${partitions[@]}"; do
     fi
   done
 
-#   if [ ! -f "$out_dir/$noise_wavs_out_dir/$part/results" ]; then
-      python3 "$boothroyd"/get_snr_k.py "$out_dir/$noise_wavs_out_dir/$part"
-#   fi
-
+  python3 "$boothroyd"/get_snr_k.py "$out_dir/$noise_wavs_out_dir/$part"
 done
 
 exit 4
