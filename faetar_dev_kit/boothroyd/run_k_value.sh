@@ -7,128 +7,293 @@
 # Copyright 2024 Sean Robertson, Michael Ong
 # Apache 2.0
 
-exp=exp        # experiment directory
-data=data/mms_lsah      # data directory
+export PYTHONUTF8=1
+[ -f "path.sh" ] && . "path.sh"
+
+usage="Usage: $0 [-h] [-p] [-S INT] [-m DIR] [-d DIR] [-P FILE] [-o DIR] [-n DIR] [-N DIR] [-L INT] [-H INT] 
+[-w NAT] [-a NAT] [-B NAT] [-l NAT]"
+pointwise=false
+point_snr=
+model=exp/mms_lsah_q
+data=
+perplexity_lm=
 partitions=(unlab_test)          # partitions to perform
-out_dir=data/boothroyd          # output directory
-norm_wavs_out_dir=norm       # normalized wavs output subdirectory
-noise_wavs_out_dir=noise       # normalized wavs + noise output subdirectory
-snr_low=-10      # lower bound (inclusive) of signal-to-noise ratio (SNR)
-snr_high=30      # upper bound (inclusive) of signal-to-noise ratio (SNR)
+out_dir=data/boothroyd
+norm_wavs_out_dir=norm
+noise_wavs_out_dir=noise
+snr_low=-10
+snr_high=30
+width=100
+alpha_inv=1
+beta=1
+lm_ord=0
+help="Determine the k value for a given model
 
-. ./path.sh
+Options
+    -h          Display this help message and exit
+    -p          Determine the k-value at a for a specific SNR
+    -s INT      The SNR (in dB) used if -p is set to true (default: '$point_snr')
+    -m DIR/{lstm, mms_lsah, mms_lsah_q}
+                The model directory (default: '$model')
+    -d DIR      The data directory (default: '$data_dir')
+    -P FILE     The language model used to calculate the perplexity (default: '$perplexity_lm')
+    -o DIR      The output directory (default: '$out_dir')
+    -n DIR      The output subdirectory for the normalized wav files (default: '$out_dir/$norm_wavs_out_dir')
+    -N DIR      The output subdirectory for the normalized wav files
+                with added noise (default: '$out_dir/$norm_wavs_out_dir')
+    -L INT      The lower bound (inclusive) of signal-to-noise ratio (SNR) in dB (default: '$snr_low')
+    -H INT      The upper bound (inclusive) of signal-to-noise ratio (SNR) in dB (default: '$snr_high')
+    -w NAT      pyctcdecode's beam width (default: $width)
+    -a NAT      pyctcdecode's alpha, inverted (default: $alpha_inv)
+    -B NAT      pyctcdecode's beta (default: $beta)
+    -l NAT      n-gram LM order. 0 is greedy; 1 is prefix with no LM (default: $lm_ord)"
 
-set -e
+while getopts "hps:m:d:P:o:n:N:L:H:w:a:B:l:" name; do
+    case $name in
+        h)
+            echo "$usage"
+            echo ""
+            echo "$help"
+            exit 0;;
+        p)
+            pointwise=true;;
+        s)
+            point_snr="$OPTARG";;
+        m)
+            model="$OPTARG";;
+        d)
+            data="$OPTARG";;
+        P)
+            perplexity_lm="$OPTARG";;
+        o)
+            out_dir="$OPTARG";;
+        n)
+            norm_wavs_out_dir="$OPTARG";;
+        N)
+            noise_wavs_out_dir="$OPTARG";;
+        L)
+            snr_low="$OPTARG";;
+        H)
+            snr_high="$OPTARG";;
+        w)
+            width="$OPTARG";;
+        a)
+            alpha_inv="$OPTARG";;
+        B)
+            beta="$OPTARG";;
+        l)
+            lm_ord="$OPTARG";;
+        *)
+            echo -e "$usage"
+            exit 1;;
+    esac
+done
+shift $(($OPTIND - 1))
+if $pointwise; then
+  if ! [[ "$point_snr" =~ ^-?[0-9]+\.?[0-9]*$ ]] 2> /dev/null; then
+      echo -e "$point_snr is not a real number! set -s appropriately, or add a leading zero!"
+      exit 1
+  fi
+fi
+if [ ! -d "$model" ]; then
+    echo -e "'$model' is not a directory! set -m appropriately!"
+    exit 1
+fi
+if [ ! -d "$data" ]; then
+    echo -e "'$data' is not a directory! set -d appropriately!"
+    exit 1
+fi
+if [ ! -f "$perplexity_lm" ]; then
+    if [ ! $lm_ord -ge 2 ]; then
+      echo -e "'$perplexity_lm' is not a file! set -P appropriately!"
+      echo -e "If you want to use the language model used for decoding, set -l to be greater than 1"
+      exit 1
+    fi
+    echo -e "'$perplexity_lm' is not a file, but -l is greater than 1,"
+    echo -e "so the perplexity calculation will use the language model used in decoding."
+fi
+if ! mkdir -p "$out_dir" 2> /dev/null; then
+    echo -e "Could not create '$out_dir'! set -o appropriately!"
+    exit 1
+fi
+if ! mkdir -p "$out_dir/$norm_wavs_out_dir" 2> /dev/null; then
+    echo -e "Could not create '$out_dir/$norm_wavs_out_dir'! set -n appropriately!"
+    exit 1
+fi
+if ! mkdir -p "$out_dir/$noise_wavs_out_dir" 2> /dev/null; then
+    echo -e "Could not create '$out_dir/$noise_wavs_out_dir'! set -N appropriately!"
+    exit 1
+fi
+if ! [[ "$snr_low" =~ ^-?[0-9]+\.?[0-9]*$ ]] 2> /dev/null; then
+    echo -e "$snr_low is not a real number! set -L appropriately, or add a leading zero!"
+    exit 1
+fi
+if ! [[ "$snr_high" =~ ^-?[0-9]+\.?[0-9]*$ ]] 2> /dev/null; then
+    echo -e "$snr_high is not a real number! set -H appropriately, or add a leading zero!"
+    exit 1
+fi
+if ! [[ "$(bc -l <<< "$snr_low <= $snr_high")" -ne 0 ]]; then
+    echo -e "$snr_low is greater than $snr_high! set -L and -H appropriately!"
+    exit 1
+fi
+if ! [ "$width" -gt 0 ] 2> /dev/null; then
+    echo -e "$width is not a natural number! set -w appropriately!"
+    exit 1
+fi
+if ! [ "$alpha_inv" -gt 0 ] 2> /dev/null; then
+    echo -e "$alpha_inv is not a natural number! set -a appropriately!"
+    exit 1
+fi
+if (( "$(bc -l <<< "$beta < 0")" )); then
+    echo -e "$beta is not greater than 0! set -B appropriately!"
+    exit 1
+fi
+if ! [ "$lm_ord" -ge 0 ] 2> /dev/null; then
+    echo -e "$lm_ord is not a non-negative int! set -l appropriately!"
+    exit 1
+fi
 
-mkdir -p "$out_dir/$norm_wavs_out_dir"
-mkdir -p "$out_dir/$noise_wavs_out_dir"
+function split_text() {
+    file="$1"
+    awk \
+    'BEGIN {
+        FS = " ";
+        OFS = " ";
+    }
+
+    {
+        filename = $NF;
+        NF --;
+        gsub(/ /, "_");
+        gsub(/\[fp\]|d[zʒ]ː|tʃː|d[zʒ]|tʃ|\Sː|\S/, "& ");
+        gsub(/ +/, " ");
+        print $0 filename;
+    }' "$file" > "$file"_
+    mv "$file"{_,}
+}
+
+set -eo pipefail
 
 boothroyd="$(dirname "$0")"
 
-# Normalize data volume to same reference average RMS
 for part in "${partitions[@]}"; do
-  bash "$boothroyd"/normalize_data_volume.sh -d "$data/$part" -o "$out_dir/$norm_wavs_out_dir/$part"
-done
+  # Data prep -------------------------------------------------
+  mkdir -p "$out_dir/$norm_wavs_out_dir/$part"
+  mkdir -p "$out_dir/$noise_wavs_out_dir/$part"
 
-exit 1
-
-
-for snr in $(seq $snr_low $snr_high); do
-  spart="${part}${mfcc_suffix}/snr$snr"
-  if [ ! -f "$data/$spart/.complete" ]; then
-    # add noise at specific SNR, then compute feats + cmvn
-    ./local/add_noise.sh $data/$npart $snr $data/$spart
-    ./steps/make_mfcc.sh --mfcc-config "$conf/mfcc${mfcc_suffix}.conf" \
-      --cmd "$train_cmd" --nj 40 \
-      $data/$spart $exp/make_mfcc/$spart
-    utils/fix_data_dir.sh $data/$spart
-    steps/compute_cmvn_stats.sh $data/$spart $exp/make_mfcc/$spart
-    touch "$data/$spart/.complete"
+  if ! [ -f "$out_dir/$norm_wavs_out_dir/$part/.done" ]; then
+    # Normalize data volume to same reference average RMS
+    bash "$boothroyd"/normalize_data_volume.sh -d "$data/$part" -o "$out_dir/$norm_wavs_out_dir/$part"
+    touch "$out_dir/$norm_wavs_out_dir/$part/.done"
   fi
-  parts+=( $spart )
-done
 
-for spart in "${parts[@]}"; do
-  partdir="$data/$spart"
-  if [[ "$mdl" =~ facebook ]]; then
-    decodedir="$mdldir/decode_null_$spart"
-    if [ ! -f "$decodedir/.complete" ]; then
-      ./local/decode_transformer.sh "$graphdir" "$partdir" "$mdl" "$decodedir"
-      touch "$decodedir/.complete"
-    fi
-  else  # not facebook
-    latdecodedir="$mdldir/decode_${latlm}_$spart"
-    if [[ "$reslm" = "$latlm" ]]; then
-      decodedir="$latdecodedir"
-    else
-      decodedir="$mdldir/decode_${latlm}_rescore_${reslm}_$spart"
+  if ! [ -f "$out_dir/$noise_wavs_out_dir/$part/trn_lstm" ]; then
+    cp "$data/$part/trn" "$out_dir/$noise_wavs_out_dir/$part/trn"
+    split_text "$out_dir/$noise_wavs_out_dir/$part/trn"
+    mv "$out_dir/$noise_wavs_out_dir/$part/trn"{,_lstm}
+  fi
+
+  for snr in $(seq $snr_low $snr_high); do
+    spart="$out_dir/$noise_wavs_out_dir/$part/snr${snr}"
+    if ! [ -f "$spart/.done_noise" ]; then
+      bash "$boothroyd"/add_noise.sh -d "$out_dir/$norm_wavs_out_dir/$part" -s "$snr" \
+      -o "$out_dir/$noise_wavs_out_dir" -p "$part"
+      touch "$spart/.done_noise"
     fi
 
-    # ivectors for tdnn
-    if [[ "$mdl" =~ tdnn ]] && [ ! -f "$exp/$ivecmdl/ivectors_${spart}/.complete" ]; then
-      steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj 10 \
-        "$data/$spart" "$exp/$ivecmdl" "$exp/$ivecmdl/ivectors_${spart}"
-      touch "$exp/$ivecmdl/ivectors_${spart}/.complete"
-    fi
+    # Decoding -------------------------------------------------
 
-    # decode the entire partition in the usual way using the lattice lm
-    if [ ! -f "$latdecodedir/.complete" ]; then
-      rm -rf "$latdecodedir"
-      mkdir -p "$(dirname "$latdecodedir")"
-      tmplatdecodedir="$exp/$mdl/tmp_decode"
-      if [[ "$mdl" =~ tdnn ]]; then
-        steps/nnet3/decode.sh --acwt 1.0 --post-decode-acwt 10.0 \
-          --nj 10 --cmd "$decode_cmd" \
-          --online-ivector-dir "$exp/$ivecmdl/ivectors_${spart}" \
-          "$graphdir" "$partdir" "$tmplatdecodedir"
+    if [[ "$(basename $model)" == "mms_lsah_q" ]]; then
+      if [ "$lm_ord" = 0 ]; then
+        name="greedy"
+        if  ! [ -f "$model/k_decode/${part}/${name}/snr${snr}_${name}.trn" ]; then
+          echo "Greedily decoding '$spart'"
+          mkdir -p "$model/k_decode/$part/$name"
+          python3 ./mms.py decode \
+              "$model" "$spart" "$model/k_decode/${part}/${name}/snr${snr}_${name}.csv_"
+          mv "$model/k_decode/${part}/${name}/snr${snr}_${name}.csv"{_,}
+          python3 ./mms.py metadata-to-trn \
+              "$model/k_decode/${part}/${name}/snr${snr}_${name}."{csv,trn_}
+          mv "$model/k_decode/${part}/${name}/snr${snr}_${name}.trn"{_,}
+        fi
       else
-        steps/decode_fmllr.sh --nj 10 --cmd "$decode_cmd" \
-          "$graphdir" "$partdir" "$tmplatdecodedir"
-      fi
-      mv "$tmplatdecodedir" "$latdecodedir"
-      touch "$latdecodedir/.complete"
-    fi
+        if [ ! -f "prep/ngram_lm.py" ]; then
+          echo "Initializing Git submodule"
+          git submodule update --init --remote prep
+        fi
+        if  ! [ -f "$model/k_decode/logits/${part}_snr${snr}/.done" ]; then
+            echo "Dumping logits of '$spart'"
+            mkdir -p "$model/k_decode/logits/${part}_snr${snr}"
+            python3 ./mms.py decode --logits-dir "$model/k_decode/logits/${part}_snr${snr}" \
+                "$model" "$spart" "/dev/null"
+            touch "$model/k_decode/logits/${part}_snr${snr}/.done"
+        fi
 
-    # now rescore with the intended lm
-    if [ ! -f "$decodedir/.complete" ]; then
-      if [[ "$reslm" =~ rnnlm ]]; then
-        # from libri_css/s5_css/run.sh
-        rnnlm/lmrescore_pruned.sh \
-          --cmd "$decode_cmd" \
-          "$data/lang_test_$latlm" "$exp/$reslm" "$partdir" "$latdecodedir" \
-          "$decodedir"
-      else
-        if [ -f "$data/lang_test_$reslm/G.fst" ]; then
-            tmplatdecodedir="$exp/$mdl/tmp_decode"
-            rm -rf "$tmplatdecodedir"
-            cp -rf "$latdecodedir" "$tmplatdecodedir"
-            steps/lmrescore.sh $self_loop_args --cmd "$decode_cmd" \
-              "$data/"lang_test_{$latlm,$reslm} "$partdir" "$tmplatdecodedir" \
-              "$decodedir"
-            rm -rf "$tmplatdecodedir"
+        if [ "$lm_ord" = 1 ]; then
+            name="w${width}_nolm"
+            alpha_inv=1
+            beta=1
+            lm_args=( )
         else
-          steps/lmrescore_const_arpa.sh --cmd "$decode_cmd" \
-            $data/lang_test_{$latlm,$reslm} "$partdir" "$latdecodedir" \
-            "$decodedir"
+          name="w${width}_lm${lm_ord}_ainv${alpha_inv}_b${beta}"
+          lm="$model/lm/${lm_ord}gram.arpa"
+          lm_args=( --lm "$lm" )
+          if ! [ -f "$lm" ]; then
+            echo "Constructing '$lm'"
+            mkdir -p "$model/lm"
+            python3 ./prep/ngram_lm.py -o $lm_ord -t 0 1 < "etc/lm_text.txt" > "${lm}_"
+            mv "$lm"{_,}
+          fi
+        fi
+
+        if ! [ -f "$model/token2id" ]; then
+            echo "Constructing '$model/token2id'"
+            python3 ./mms.py vocab-to-token2id "$model/"{vocab.json,token2id}
+        fi
+
+        if ! [ -f "$model/k_decode/${part}/${name}/snr${snr}_${name}.trn" ]; then
+            echo "Decoding $spart"
+            mkdir -p "$model/k_decode/${part}/${name}"
+            python3 ./prep/logits-to-trn-via-pyctcdecode.py \
+                --char "${lm_args[@]}" \
+                --words "etc/lm_words.txt" \
+                --width $width \
+                --beta $beta \
+                --alpha-inv $alpha_inv \
+                --token2id "$model/token2id" \
+                "$model/k_decode/logits/${part}_snr${snr}" "$model/k_decode/${part}/${name}/snr${snr}_${name}.trn"
         fi
       fi
-      touch "$decodedir/.complete"
     fi
-  fi
 
-  if [ ! -f "$decodedir/wer_best" ]; then
-    grep -H WER "$decodedir/"wer* | utils/best_wer.sh > "$decodedir/wer_best"
-  fi
+    # k calculation -------------------------------------------------
+    # make sure to set lm above when decoding at some point for -l >= 2
+    if [ ! -f "$perplexity_lm" ]; then
+      perplexity_lm=$lm
+    fi
 
-  if [ ! -f "$decodedir/uttwer_best" ]; then
-    ./local/wer_per_utt.sh "$graphdir" "$decodedir/scoring"
-    best_uttwer="$(awk '{gsub(/.*wer_/, "", $NF); gsub("_", ".", $NF);  print "scoring/"$NF".uttwer"}' "$decodedir/wer_best")"
-    ln -sf "$best_uttwer" "$decodedir/uttwer_best"
-    [ -f "$decodedir/uttwer_best" ] || exit 1
-  fi
+    perplexity_filename="$out_dir/$noise_wavs_out_dir/$part/perplexity_$(basename $perplexity_lm)"
+
+    if [ ! -f "$perplexity_filename" ]; then
+      python3 "$boothroyd"/get_perplexity.py "$perplexity_lm" "$out_dir/$noise_wavs_out_dir/$part/trn_lstm"
+    fi
+
+    if [ ! -f "$spart/.done_split" ]; then
+      bash "$boothroyd"/section_data.sh \
+      "$perplexity_filename" \
+      "$model/k_decode/${part}/${name}/snr${snr}_${name}.trn" 3 "$spart"
+      echo -e "split using: $perplexity_filename" > "$spart/.done_split"
+    fi
+  done
+
+#   if [ ! -f "$out_dir/$noise_wavs_out_dir/$part/results" ]; then
+      python3 "$boothroyd"/get_snr_k.py "$out_dir/$noise_wavs_out_dir/$part"
+#   fi
+
 done
 
-find "$exp/" -type f -name 'wer_best' -exec cat {} \;
+exit 4
+
 
 
 
@@ -157,18 +322,26 @@ find "$exp/" -type f -name 'wer_best' -exec cat {} \;
 
 # data=data/boothroyd
 # model="$1"
+# exp_name="$2"
 
 # for x in test train dev; do
+#     mkdir -p "$data"/"$x"_"$model"
+
+#     cp data/lstm/"$x"/trn_lstm "$data"/"$x"_"$model"/trn_lstm
+
+#     python3 faetar_dev_kit/boothroyd/get_perplexity.py \
+#     exp/mms_lsah_q/lm/5gram.arpa "$data"/"$x"_"$model"/trn_lstm 
+
 #     faetar_dev_kit/boothroyd/section_data.sh \
-#     "$data"/"$x"_"$model"/perplexity_5gram.arpa exp/mms_lsah/decode/"$x"_greedy.trn 3
+#     "$data"/"$x"_"$model"/perplexity_5gram.arpa exp/"$exp_name"/decode/"$x"_w100_unlablm5_ainv1_b1.trn 3
     
 #     echo "hp/zp $x"
-#     python faetar_dev_kit/boothroyd/get_k.py \
+#     python3 faetar_dev_kit/boothroyd/get_single_k.py \
 #     "$data"/"$x"_"$model"/1_ref_perplexity_5gram.arpa "$data"/"$x"_"$model"/1_hyp_perplexity_5gram.arpa \
 #     "$data"/"$x"_"$model"/3_ref_perplexity_5gram.arpa "$data"/"$x"_"$model"/3_hyp_perplexity_5gram.arpa
 
 #     echo "lp/zp $x"
-#     python faetar_dev_kit/boothroyd/get_k.py \
+#     python3 faetar_dev_kit/boothroyd/get_single_k.py \
 #     "$data"/"$x"_"$model"/2_ref_perplexity_5gram.arpa "$data"/"$x"_"$model"/2_hyp_perplexity_5gram.arpa \
 #     "$data"/"$x"_"$model"/3_ref_perplexity_5gram.arpa "$data"/"$x"_"$model"/3_hyp_perplexity_5gram.arpa
 
