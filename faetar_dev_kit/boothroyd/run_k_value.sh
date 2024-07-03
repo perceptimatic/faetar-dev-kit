@@ -18,7 +18,7 @@ point_snr=
 model=exp/mms_lsah_q
 data=
 perplexity_lm=
-partitions=(dev)          # partitions to perform
+partitions=(dev test train)          # partitions to perform
 out_dir=data/boothroyd
 norm_wavs_out_dir=norm
 noise_wavs_out_dir=noise
@@ -200,7 +200,7 @@ if ! $pointwise; then
 
     for snr in $(seq $snr_low $snr_high); do
         spart="$out_dir/$noise_wavs_out_dir/$part/snr${snr}"
-        if ! [ -f "$spart/.done_noise" ]; then
+        if ! [[ -f "$spart/.done_noise" || -f "$spart/.done_split" ]]; then
             bash "$boothroyd"/add_noise.sh -d "$out_dir/$norm_wavs_out_dir/$part" -s "$snr" \
             -o "$out_dir/$noise_wavs_out_dir" -p "$part"
             touch "$spart/.done_noise"
