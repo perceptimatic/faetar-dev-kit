@@ -70,6 +70,7 @@ hp_errs = []
 out_path = os.path.join(data_dir, "results")
 lp_image = os.path.join(data_dir, "lp_zp_graph.png")
 hp_image = os.path.join(data_dir, "hp_zp_graph.png")
+both_image = os.path.join(data_dir, "overlay_graph.png")
 out = open(out_path, "w")
 
 for snr_dir in os.scandir(data_dir):
@@ -107,3 +108,13 @@ plt.plot(xseq, xseq**hz_k, 'r')
 plt.xlabel('ZP error rate')
 plt.ylabel('HP error rate')
 plt.savefig(hp_image)
+
+plt.figure(figsize = (20,16))
+plt.plot(zp_errs, lp_errs, 'bo')
+plt.plot(zp_errs, hp_errs, 'b+')
+xseq = np.linspace(0, 1, num=100)
+plt.plot(xseq, xseq**lz_k, 'r')
+plt.plot(xseq, xseq**hz_k, 'g')
+plt.xlabel('ZP error rate')
+plt.ylabel(' error rate')
+plt.savefig(both_image)
