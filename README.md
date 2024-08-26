@@ -28,8 +28,9 @@ pip install -r requirements.txt
 ## ASR baselines
 
 ``` sh
-# assumes data/ is populated with {train,dev,test,...} partitions and
-# exp/ contains all artifacts (checkpoints, hypothesis transcriptions, etc.)
+# assumes data/ is populated with {mms_lsah, ml_superb,...} partitions which have 
+# {train,dev,test,...} subpartitions
+# and exp/ contains all artifacts (checkpoints, hypothesis transcriptions, etc.)
 
 # Train and greedily decode MMS-LSAH
 # successfully trained on a single T4 core
@@ -42,8 +43,8 @@ pip install -r requirements.txt
 ./run_ml_superb.sh  # 10min
 ./run_ml_superb.sh -e exp/mms-1h -p 1h # 1h
 
-# compute the PER, differences, and CIs of a model
-./evaluate_asr.sh -d data -p train -e exp/mms_lsah -n 1000  # -h flag for options
+# compute the PER, differences, and CIs of a model on a partition of the data directory
+./evaluate_asr.sh -d data/mms_lsah -p train -e exp/mms_lsah -n 1000  # -h flag for options
 ```
 
 ## License and attribution
