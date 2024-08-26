@@ -19,7 +19,7 @@ export PYTHONUTF8=1
 
 usage="Usage: $0 [-h] [-o] [-e DIR] [-b DIR] [-d DIR] [-w NAT] [-a NAT] [-B NAT] [-l NNINT] [-s NAT]"
 only=false
-exp=exp/mms_lsah_q
+exp=exp/mms_lsah
 data=data/mms_lsah
 width=100
 alpha_inv=1
@@ -123,7 +123,7 @@ if [ ! -f "prep/ngram_lm.py" ]; then
     git submodule update --init --remote prep
 fi
 
-for part in train dev test train_w_unlab; do
+for part in train dev test; do
     if ! [ -f "$data/$part/metadata.csv" ]; then
         echo "Creating metadata.csv in '$data/$part'"
         mkdir -p "$data/$part"
@@ -144,13 +144,13 @@ done
 
 if ! [ -f "$exp/vocab.json" ]; then
     echo "Creating $exp/vocab.json"
-    ./mms.py write-vocab "$data/train_w_unlab/metadata.csv" "$exp/vocab.json"
+    ./mms.py write-vocab "$data/train/metadata.csv" "$exp/vocab.json"
     if $only; then exit 0; fi
 fi
 
 if ! [ -f "$exp/config.json" ]; then
     echo "Training model and writing to '$exp'"
-    ./mms.py train "$exp/vocab.json" "$data/"{train_w_unlab,dev} "$exp"
+    ./mms.py train "$exp/vocab.json" "$data/"{train,dev} "$exp"
     if $only; then exit 0; fi
 fi
 
@@ -198,7 +198,7 @@ else
         if ! [ -f "$lm" ]; then
             echo "Constructing '$lm'"
             mkdir -p "$exp/lm"
-            ./prep/ngram_lm.py -o $lm_ord -t 0 1 < "etc/lm_text.txt" > "${lm}_"
+            ./prep/ngram_lm.py -o $lm_ord -t 0 1 -f "etc/lm_text.txt" > "${lm}_"
             mv "$lm"{_,}
             if $only; then exit 0; fi
         fi
