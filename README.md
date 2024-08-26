@@ -42,8 +42,8 @@ pip install -r requirements.txt
 ./run_ml_superb.sh  # 10min
 ./run_ml_superb.sh -e exp/mms-1h -p 1h # 1h
 
-# compute the PER, differences, and CIs of all models
-./evaluate_asr.sh -n 1000  # -h flag for options
+# compute the PER, differences, and CIs of a model
+./evaluate_asr.sh -d data -p train -e exp/mms_lsah -n 1000  # -h flag for options
 ```
 
 ## License and attribution
