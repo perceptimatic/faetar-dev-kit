@@ -1,10 +1,11 @@
 pyarrow==15.0.2
 soundfile
 jiwer
-torch
+torch==2.3.1
 datasets
 transformers
 tqdm
 safetensors
 evaluate
 librosa
+accelerate

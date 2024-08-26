@@ -39,10 +39,6 @@ def main(args: Optional[Sequence[str]] = None):
         from .decode import decode
 
         return decode(options)
-    elif options.cmd == "evaluate":
-        from .io import evaluate
-
-        return evaluate(options)
     elif options.cmd == "metadata-to-trn":
         from .io import metadata_to_trn
 
