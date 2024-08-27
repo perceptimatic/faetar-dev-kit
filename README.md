@@ -58,16 +58,14 @@ pip install -r requirements.txt
 
 ## Evaluating your own model
 
-Train the model using the any of the training sets and validate with the evaluation sets
-
-Place the decodings for each model in a sudirectory of a directory called decodings (if decodings has no subdirectories it is assumed that the decodings were created by only one model)
+Place the decodings for each model in a sudirectory of a directory called decodings. (if decodings has no subdirectories it is assumed that the decodings were created by only one model)
 
 The decodings should be named {partition}_*.trn.
 The format of the trn files should have on each line: <transcription> (<file_id>).
 
-To obtain the evaluation metrics run
+To obtain the evaluation metrics run:
 ``` sh
-./evaluate_asr.sh -d data/{model_name} -p {evaluation_partition} -e decodings/{model_name} -r {per, cer, wer}
+./evaluate_asr.sh -d data/{model_name} -p {evaluation_partition} -e decodings/{model_name} -r "per"
 ```
 
 ## License and attribution
