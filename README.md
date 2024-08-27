@@ -8,7 +8,8 @@ Data processing and baselines for the 2024 Faetar Grand Challenge
 | train | fine tuning / training set |
 | 10min | (optional) fine tuning / training set |
 | 1h | (optional) fine tuning / training set |
-| dev | evaluation set |
+| unlab | open |
+| dev | (always) validation set; (during the challenge) evaluation set |
 | test | (not available during challenge period) evaluation set |
 
 ## Installation & activation
