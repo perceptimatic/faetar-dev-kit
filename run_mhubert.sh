@@ -21,13 +21,13 @@ usage="Usage: $0 [-h] [-o] [-e DIR] [-d DIR] [-m DIR] [-w NAT] [-a NAT] [-b NAT]
 only=false
 exp=exp/mms_lsah
 data=data
-model="facebook/mms-1b-all"
+model=""
 width=100
 alpha_inv=1
 beta=1
 lm_ord=0
-training_kwargs=conf/mms_lsah/training_kwargs.json
-wav2vec2_kwargs=conf/mms_lsah/wav2vec2_kwargs.json
+training_kwargs=conf/hubert/training_kwargs.json
+wav2vec2_kwargs=conf/hubert/wav2vec2_kwargs.json
 help="Train and decode with the mms-lsah baseline
 
 Options
@@ -128,11 +128,10 @@ fi
 
 if ! [ -f "$exp/config.json" ]; then
     echo "Training model and writing to '$exp'"
-    ./mms.py train "$exp/vocab.json" "$data/"{train,dev} "$exp" \
+    ./mms.py train-hubert "$exp/vocab.json" "$data/"{train,dev} "$exp" \
 	    --pretrained-model-id="$model" \
-            --training-kwargs-json="$training_kwargs" \
-            --wav2vec2-kwargs-json="$wav2vec2_kwargs"
-
+	    --training-kwargs-json="$training_kwargs" \
+	    --wav2vec2-kwargs-json="$wav2vec2_kwargs"
     if $only; then exit 0; fi
 fi
 
@@ -141,7 +140,7 @@ if [ "$lm_ord" = 0 ]; then
         if  ! [ -f "$exp/decode/${part}_greedy.trn" ]; then
             echo "Greedily decoding '$data/$part'"
             mkdir -p "$exp/decode"
-            ./mms.py decode \
+            ./mms.py decode-hubert \
                 "$exp" "$data/$part" "$exp/decode/${part}_greedy.csv_"
             mv "$exp/decode/${part}_greedy.csv"{_,}
             ./mms.py metadata-to-trn \
@@ -162,7 +161,7 @@ else
         if  ! [ -f "$exp/decode/logits/$part/.done" ]; then
             echo "Dumping logits of '$data/$part'"
             mkdir -p "$exp/decode/logits/$part"
-            ./mms.py decode \
+            ./mms.py decode-hubert \
                 --dump-logits "$exp/decode/logits/$part" \
                 "$exp" "$data/$part" "/dev/null"
             touch "$exp/decode/logits/$part/.done"

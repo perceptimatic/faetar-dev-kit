@@ -149,7 +149,9 @@ class Options(object):
         "compile-metadata",
         "write-vocab",
         "train",
+        "train-hubert",
         "decode",
+        "decode-hubert",
         "evaluate",
         "metadata-to-trn",
         "vocab-to-token2id",
@@ -397,8 +399,14 @@ class Options(object):
 
         cls._add_train_args(cmds.add_parser("train", help="fine-tune an mms model"))
 
+        cls._add_train_args(cmds.add_parser("train-hubert", help="fine-tune a hubert model"))
+
         cls._add_decode_args(
             cmds.add_parser("decode", help="decode with fine-tuned mms model")
+        )
+
+        cls._add_decode_args(
+            cmds.add_parser("decode-hubert", help="decode with fine-tuned hubert model")
         )
 
         cls._add_evaluate_args(
