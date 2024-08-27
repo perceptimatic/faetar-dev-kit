@@ -43,17 +43,17 @@ pip install -r requirements.txt
 
 # Train and greedily decode MMS-LSAH
 # successfully trained on a single T4 core
-./run_mms_lsah.sh  # -h flag for options
+./run_mms_lsah.sh -e baselines/mms_lsah # -h flag for options
 
 # Train and greedily decode MMS-10min or MMS-1h
 # makes a new virtualenv; won't work on Git Bash
 #  (faetar-dev-kit should contain necessary build tools)
 # successfully trained on a single A40 core
-./run_ml_superb.sh  # 10min
-./run_ml_superb.sh -e exp/mms-1h -p 1h # 1h
+./run_ml_superb.sh -e baselines/mms-10min # 10min
+./run_ml_superb.sh -e baselines/mms-1h -p 1h # 1h
 
 # compute the PER, differences, and CIs of a model on a partition of the data directory
-./evaluate_asr.sh -d data/mms_lsah -p train -e exp/mms_lsah -n 1000  # -h flag for options
+./evaluate_asr.sh -d data/mms_lsah -p train -e baselines/mms_lsah -n 1000  # -h flag for options
 ```
 
 ## Evaluating your own model
