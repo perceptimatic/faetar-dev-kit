@@ -21,7 +21,6 @@ from tqdm import tqdm
 
 def extract_hidden(hidden_dir, model_dir, data_dir, lang):
     hidden_dir = Path(hidden_dir).resolve()
-    model_dir = Path(model_dir).resolve()
     data_dir = Path(data_dir).resolve()
 
     model = Wav2Vec2ForCTC.from_pretrained(model_dir, target_lang=lang,
@@ -44,10 +43,6 @@ def extract_hidden(hidden_dir, model_dir, data_dir, lang):
     states = None
 
     for audio in tqdm(data["audio"]):
-        path = hidden_dir / os.path.splitext(Path(audio["path"]).relative_to(data_dir).as_posix())[0]
-
-        if os.path.exists(f"{path}_48.pt"):
-            continue
 
         inputs = processor(
             audio["array"],
@@ -58,9 +53,11 @@ def extract_hidden(hidden_dir, model_dir, data_dir, lang):
         states = model(inputs.input_values).hidden_states
 
         for i in [12, 24, 36, 46, 47, 48]:
-            pt = f"{path}_{i}.pt"
-            os.makedirs(os.path.split(path)[0], exist_ok=True)
-            torch.save(states[i], pt)
+            filename = os.path.splitext(Path(audio["path"]).relative_to(data_dir).as_posix())[0]
+            partition = data_dir.name
+            out_path = f"{hidden_dir}/layer_{i}/{partition}/feat/{filename}.pt"
+            os.makedirs(os.path.split(out_path)[0], exist_ok=True)
+            torch.save(torch.squeeze(states[i]), out_path)
 
     return states
 

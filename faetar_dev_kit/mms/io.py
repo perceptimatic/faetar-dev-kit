@@ -45,7 +45,10 @@ def compile_metadata(options: Options):
                     file=sys.stderr,
                 )
                 return 1
-            entries.append(txt.read_text().strip())
+            if txt.read_text().strip() == "nan":
+                entries.append(" " + txt.read_text().strip())
+            else:
+                entries.append(txt.read_text().strip())
         fp.write(",".join(entries))
         fp.write("\n")
 
@@ -115,63 +118,6 @@ def write_vocab(options: Options):
     json.dump(vocab_json, options.vocab_json.open("w"))
 
     return 0
-
-
-def evaluate(options: Options):
-
-    special = compile(r"(:?\[[^]]+\])|(:?<[^>]+>)\s+")  # remove special tokens
-    # long = compile(r"(?<=(?P<phn>.))\1+")  # replace consecutive phones with ː
-    spaces = compile(r"\s+")  # remove duplicate spaces
-
-    # XXX(sdrobert): keep up-to-date with run.sh:filter(...)
-    def _filter(transcript: str) -> str:
-
-        transcript = special.sub(" ", transcript)
-        # transcript = long.sub("\u02d0", transcript)
-
-        if options.error_type == "per":
-            transcript = transcript.replace(" ", "")
-        else:
-            transcript = spaces.sub(" ", transcript)
-        return transcript
-
-    ref_dict = DictReader(options.ref_csv.open(newline=""), delimiter=",")
-    hyp_dict = dict(
-        (row["file_name"], row["sentence"])
-        for row in DictReader(options.hyp_csv.open(newline=""), delimiter=",")
-    )
-    refs, hyps = [], []
-    for row in ref_dict:
-        file_name, ref = row["file_name"], _filter(row["sentence"])
-        if file_name not in hyp_dict:
-            print(
-                f"file '{file_name}' row could not be found in '{options.hyp_csv}'!",
-                file=sys.stderr,
-            )
-            return 1
-        hyp = _filter(hyp_dict.pop(file_name))
-        if ref:
-            refs.append(ref)
-            hyps.append(hyp)
-        else:
-            print(
-                f"filter reference transcript of '{file_name}' is empty. Skipping",
-                file=sys.stderr,
-            )
-
-    if len(hyp_dict):
-        print(
-            f"'{options.hyp_csv}' contains extra rows: {', '.join(hyp_dict)}",
-            file=sys.stderr,
-        )
-
-    if options.error_type == "wer":
-        print(f"{jiwer.wer(refs, hyps):.01%}")
-    else:
-        print(f"{jiwer.cer(refs, hyps):.01%}")
-
-    return 0
-
 
 def metadata_to_trn(options: Options):
 

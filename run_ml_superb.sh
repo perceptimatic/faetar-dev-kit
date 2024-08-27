@@ -22,7 +22,7 @@ only=false
 gpu_inference=false
 feat_jobs=1 # can quickly OOM if you do more than one for MMS
 inference_jobs=1  # can quickly OOM if you do more than one for MMS
-data=data
+data=data/ml_superb
 dump=dump
 exp=exp/mms-10min
 train_part=10min
@@ -152,8 +152,8 @@ pushd egs2/ml_superb/asr1
 if ! [ -f downloads/hlvc/.done ]; then
     echo "Formatting data for ML-SUPERB in $PWD/downloads"
     mkdir -p downloads/hlvc/fae/wav
-    find "$data/1hr" "$data/dev" "$data/test" -name '*.wav' -exec ln -sf {} downloads/hlvc/fae/wav/ \;
-    find "$data/1hr" -name '*.txt' |
+    find "$data/1h" "$data/dev" "$data/test" -name '*.wav' -exec ln -sf {} downloads/hlvc/fae/wav/ \;
+    find "$data/1h" -name '*.txt' |
         sort |
         awk -F "/" '{split($NF, bn, "."); getline < $0; print bn[1]" A "$0}' > downloads/hlvc/fae/transcript_1h_train.txt
     find "$data/10min" -name '*.txt' |
@@ -202,6 +202,16 @@ done
 popd
 
 for part in dev test; do
+    if ! [ -f "$data/$part/trn" ]; then
+        echo "Creating reference trn file in '$data/$part'"
+        :> "$data/$part/trn"
+        for file in "$data"/"$part"/*.wav; do
+            filename="$(basename "$file" .wav)"
+            printf "%s (%s)\n" "$(< "${file%%.wav}.txt")" "$filename" >> "$data/$part/trn"
+        done
+        if $only; then exit 0; fi
+    fi
+
     if [ ! -f "$exp/decode/${part}_beam1.trn" ]; then
         echo "Writing $exp/decode/${part}_beam1.trn"
         mkdir -p "$exp/decode"
@@ -216,4 +226,17 @@ for part in dev test; do
         mv "$exp/decode/${part}_beam1.trn"{_,}
         if $only; then exit 0; fi
     fi
+done
+
+popd
+
+for er in wer cer per; do
+    echo "===================================================================="
+    echo "                       ERROR TYPE: $er                              "
+    echo "===================================================================="
+    echo ""
+    for part in test dev; do
+        ./evaluate_asr.sh -d "$data" -e "$exp" -p "$part" -r "$er"
+        echo ""
+    done
 done
