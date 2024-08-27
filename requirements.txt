@@ -9,3 +9,6 @@ safetensors
 evaluate
 librosa
 accelerate
+"git+https://github.com/sdrobert/pydrobert-pytorch.git"
+"git+https://github.com/sdrobert/kenlm"
+confidence_intervals
