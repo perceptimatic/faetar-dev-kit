@@ -63,9 +63,9 @@ Place the decodings for each model in a sudirectory of a directory called decodi
 The decodings should be named {partition}_*.trn.
 The format of the trn files should have on each line: <transcription> (<file_id>).
 
-To obtain the evaluation metrics run:
+To obtain the evaluation metrics, use the helper script `summary.sh`
 ``` sh
-./evaluate_asr.sh -d data/{model_name} -p {evaluation_partition} -e decodings/{model_name} -r "per"
+./summary.sh decodings/ data/
 ```
 
 ## License and attribution
