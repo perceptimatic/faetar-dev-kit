@@ -1,7 +1,15 @@
 # faetar-dev-kit
 Data processing and baselines for the 2024 Faetar Grand Challenge
 
+## Data Partitions
 
+| Partition Name | Usage |
+| ------------- | ------------- |
+| train | fine tuning / training set |
+| 10min | (optional) fine tuning / training set |
+| 1h | (optional) fine tuning / training set |
+| dev | evaluation set |
+| test | (not available during challenge period) evaluation set |
 
 ## Installation & activation
 
@@ -45,6 +53,20 @@ pip install -r requirements.txt
 
 # compute the PER, differences, and CIs of a model on a partition of the data directory
 ./evaluate_asr.sh -d data/mms_lsah -p train -e exp/mms_lsah -n 1000  # -h flag for options
+```
+
+## Evaluating your own model
+
+Train the model using the any of the training sets and validate with the evaluation sets
+
+Place the decodings for each model in a sudirectory of a directory called decodings (if decodings has no subdirectories it is assumed that the decodings were created by only one model)
+
+The decodings should be named {partition}_*.trn.
+The format of the trn files should have on each line: <transcription> (<file_id>).
+
+To obtain the evaluation metrics run
+``` sh
+./evaluate_asr.sh -d data/{model_name} -p {evaluation_partition} -e decodings/{model_name} -r {per, cer, wer}
 ```
 
 ## License and attribution
