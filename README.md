@@ -61,7 +61,7 @@ pip install -r requirements.txt
 Place the decodings for each model in a sudirectory of a directory called decodings. (if decodings has no subdirectories it is assumed that the decodings were created by only one model)
 
 The decodings should be named {partition}_*.trn.
-The format of the trn files should have on each line: <transcription> (<file_id>).
+The format of the trn files should have on each line: {transcription} ({file_id}).
 
 To obtain the evaluation metrics, use the helper script `summary.sh`
 ``` sh
