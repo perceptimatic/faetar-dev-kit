@@ -166,3 +166,4 @@ python3 ./prep/error-rates-from-trn.py \
     --bootstrap-samples "$bootstrap_samples" \
     --bootstrap-utt2grp "$data/$part/utt2rec" \
     "$data/$part/trn_${er}" "${hyps[@]}"
+

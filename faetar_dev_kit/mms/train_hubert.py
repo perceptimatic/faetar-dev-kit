@@ -28,11 +28,10 @@ import torch
 import numpy as np
 
 from safetensors.torch import save_file as safe_save_file
-from transformers.models.wav2vec2.modeling_wav2vec2 import WAV2VEC2_ADAPTER_SAFE_FILE
 from transformers import (
     Wav2Vec2CTCTokenizer,
     Wav2Vec2Processor,
-    Wav2Vec2ForCTC,
+    HubertForCTC,
     TrainingArguments,
     Trainer,
 )
@@ -101,14 +100,12 @@ def train(options: Options):
     processor = Wav2Vec2Processor.from_pretrained(
         options.pretrained_model_id,
     )
-
-    if not options.lang: options.lang = "fae"
     processor.tokenizer = Wav2Vec2CTCTokenizer(
         options.vocab_json,
         unk_token=options.unk,
         pad_token=options.pad,
         word_delimiter_token=options.word_delimiter,
-        target_lang=options.lang,
+        target_lang="fae",
     )
 
     with open(options.wav2vec2_kwargs_json) as fp:
@@ -117,7 +114,6 @@ def train(options: Options):
     for name, expected in (
         ("pad_token_id", processor.tokenizer.pad_token_id),
         ("vocab_size", len(processor.tokenizer)),
-        ("target_lang", options.pretrained_model_lang),
     ):
         if name not in wav2vec2_kwargs:
             wav2vec2_kwargs[name] = expected
@@ -133,18 +129,12 @@ def train(options: Options):
     if "ignore_mismatched_sizes" not in wav2vec2_kwargs:
         wav2vec2_kwargs["ignore_mismatched_sizes"] = True
 
-    model = Wav2Vec2ForCTC.from_pretrained(
+    model = HubertForCTC.from_pretrained(
         options.pretrained_model_id, **wav2vec2_kwargs
     )
 
     dev = load_partition(options, "dev", processor)
     train = load_partition(options, "train", processor)
-
-    model.init_adapter_layers()
-    model.freeze_base_model()
-    adapter_weights = model._get_adapters()
-    for param in adapter_weights.values():
-        param.requires_grad = True
 
     with open(options.training_kwargs_json) as fp:
         training_kwargs = json.load(fp)
@@ -171,10 +161,5 @@ def train(options: Options):
 
     trainer.save_model(options.model_dir)
     processor.tokenizer.save_pretrained(options.model_dir)
-
-    adapter_file = WAV2VEC2_ADAPTER_SAFE_FILE.format(options.lang)
-    adapter_file = options.model_dir / adapter_file
-
-    safe_save_file(model._get_adapters(), adapter_file, metadata={"format": "pt"})
 
     return 0

@@ -35,10 +35,22 @@ def main(args: Optional[Sequence[str]] = None):
         from .train import train
 
         return train(options)
+    elif options.cmd == "train-hubert":
+        from .train_hubert import train
+
+        return train(options)
     elif options.cmd == "decode":
         from .decode import decode
 
         return decode(options)
+    elif options.cmd == "decode-hubert":
+        from .decode_hubert import decode
+
+        return decode(options)
+    elif options.cmd == "evaluate":
+        from .io import evaluate
+
+        return evaluate(options)
     elif options.cmd == "metadata-to-trn":
         from .io import metadata_to_trn
 

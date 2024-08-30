@@ -149,7 +149,10 @@ class Options(object):
         "compile-metadata",
         "write-vocab",
         "train",
+        "train-hubert",
         "decode",
+        "decode-hubert",
+        "evaluate",
         "metadata-to-trn",
         "vocab-to-token2id",
     ]
@@ -189,6 +192,13 @@ class Options(object):
     # data: pathlib.Path
     # metadata_csv: pathlib.Path
 
+    # evaluate kwargs
+    error_type: Literal["per", "cer", "wer"] = "per"
+
+    # evaluate args
+    ref_csv: pathlib.Path
+    hyp_csv: pathlib.Path
+
     # metadata2trn args
     # metadata_csv: pathlib.Path
     trn: pathlib.Path
@@ -207,7 +217,7 @@ class Options(object):
         )
 
         cls._add_argument(
-            parser, "data", type=ReadDirType, help="work directory"
+            parser, "data", type=ReadDirType, help="AudioFolder directory"
         )
 
     @classmethod
@@ -311,6 +321,30 @@ class Options(object):
         )
 
     @classmethod
+    def _add_evaluate_args(cls, parser: argparse.ArgumentParser):
+
+        parser.add_argument(
+            "--error-type",
+            choices=["per", "cer", "wer"],
+            default=cls.error_type,
+            help="What type of error to compute. PER = phone; CER = character; "
+            "WER = word",
+        )
+
+        cls._add_argument(
+            parser,
+            "ref_csv",
+            type=ReadFileType,
+            help="metadata.csv of reference transcriptions",
+        )
+        cls._add_argument(
+            parser,
+            "hyp_csv",
+            type=ReadFileType,
+            help="metadata.csv of hypothesis transcriptions",
+        )
+
+    @classmethod
     def _add_metadata_to_trn_args(cls, parser: argparse.ArgumentParser):
 
         cls._add_argument(
@@ -365,8 +399,18 @@ class Options(object):
 
         cls._add_train_args(cmds.add_parser("train", help="fine-tune an mms model"))
 
+        cls._add_train_args(cmds.add_parser("train-hubert", help="fine-tune a hubert model"))
+
         cls._add_decode_args(
             cmds.add_parser("decode", help="decode with fine-tuned mms model")
+        )
+
+        cls._add_decode_args(
+            cmds.add_parser("decode-hubert", help="decode with fine-tuned hubert model")
+        )
+
+        cls._add_evaluate_args(
+            cmds.add_parser("evaluate", help="Determine error rates")
         )
 
         cls._add_vocab_to_token2id_args(
