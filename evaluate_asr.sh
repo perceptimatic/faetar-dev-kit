@@ -123,7 +123,7 @@ filter() {
         {
             file = $NF;
             NF --;
-            gsub(/d[zʒ]ː|tʃː|d[zʒ]|tʃ|\Sː|\S/, "& ");
+             gsub(/d[zʒ]ː|t[sʃ]ː|d[zʒ]|t[sʃ]|\Sː|\S/, "& ");
             gsub(/ +/, " ");
             print $0 file;
         }' "${fn}_wer" > "${fn}_per_"
