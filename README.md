@@ -1,16 +1,7 @@
 # faetar-dev-kit
-Data processing and baselines for the 2024 Faetar Grand Challenge
+Data processing and baselines for the 2025 Faetar Low-Resource ASR Challenge
 
-## Data Partitions
-
-| Partition Name | Usage |
-| ------------- | ------------- |
-| train | fine tuning / training set |
-| 10min | (optional) fine tuning / training set |
-| 1h | (optional) fine tuning / training set |
-| unlab | open |
-| dev | (always) validation set; (during the challenge) evaluation set |
-| test | (not available during challenge period) evaluation set |
+See the [Challenge website](https://perceptimatic.github.io/faetarspeech/) for more information, as well as the [paper documenting the benchmark corpus](https://arxiv.org/abs/2409.08103)
 
 ## Installation & activation
 
