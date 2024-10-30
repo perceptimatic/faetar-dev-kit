@@ -63,8 +63,7 @@ To obtain the evaluation metrics, use the helper script `summary.sh`
 
 The *MMS-LSAH* baseline adapts the excellent MMS fine-tuning [blog
 post](https://huggingface.co/blog/mms_adapters) by Patrick von Platen to the
-challenge. We use Python scripts, not notebooks, because we're not savages. I
-could not see any license information in the MMS blog post.
+challenge. I could not see any license information in the MMS blog post.
 
 [ESPNet](https://github.com/espnet/espnet/tree/master) is [Apache
 2.0](./LICENSE) licensed. The forked version of ESPNet used in the *MMS-10min*
