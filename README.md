@@ -1,7 +1,19 @@
 # faetar-dev-kit
-Data processing and baselines for the 2025 Faetar Low-Resource ASR Challenge
+Data processing and baselines for the 2024 Faetar Grand Challenge
 
-See the [Challenge website](https://perceptimatic.github.io/faetarspeech/) for more information, as well as the [paper documenting the benchmark corpus](https://arxiv.org/abs/2409.08103)
+## Data Partitions
+
+| Partition Name | Usage |
+| ------------- | ------------- |
+| train | fine tuning / training set |
+| 10min | (optional) fine tuning / training set |
+| 1h | (optional) fine tuning / training set |
+| reduced_train | (optional) fine tuning / training set |
+| dirty_data_train | (optional) fine tuning / training set |
+| unlab | open |
+| dev | (always) validation set; (during the challenge) evaluation set |
+| test | (not available during challenge period) evaluation set |
+(Note: dirty_data_train does not contain the full dirty data files, which must be requested)
 
 ## Installation & activation
 
@@ -34,17 +46,17 @@ pip install -r requirements.txt
 
 # Train and greedily decode MMS-LSAH
 # successfully trained on a single T4 core
-./run_mms_lsah.sh  # -h flag for options
+./run_mms_lsah.sh -e baselines/mms_lsah # -h flag for options
 
 # Train and greedily decode MMS-10min or MMS-1h
 # makes a new virtualenv; won't work on Git Bash
 #  (faetar-dev-kit should contain necessary build tools)
 # successfully trained on a single A40 core
-./run_ml_superb.sh  # 10min
-./run_ml_superb.sh -e exp/mms-1h -p 1h # 1h
+./run_ml_superb.sh -e baselines/mms-10min # 10min
+./run_ml_superb.sh -e baselines/mms-1h -p 1h # 1h
 
 # compute the PER, differences, and CIs of a model on a partition of the data directory
-./evaluate_asr.sh -d data/mms_lsah -p train -e exp/mms_lsah -n 1000  # -h flag for options
+./evaluate_asr.sh -d data/mms_lsah -p train -e baselines/mms_lsah -n 1000  # -h flag for options
 ```
 
 ## Evaluating your own model
@@ -52,7 +64,7 @@ pip install -r requirements.txt
 Place the decodings for each model in a sudirectory of a directory called decodings. (if decodings has no subdirectories it is assumed that the decodings were created by only one model)
 
 The decodings should be named {partition}_*.trn.
-The format of the trn files should have on each line: <transcription> (<file_id>).
+The format of the trn files should have on each line: {transcription} ({file_id}).
 
 To obtain the evaluation metrics, use the helper script `summary.sh`
 ``` sh
@@ -63,7 +75,8 @@ To obtain the evaluation metrics, use the helper script `summary.sh`
 
 The *MMS-LSAH* baseline adapts the excellent MMS fine-tuning [blog
 post](https://huggingface.co/blog/mms_adapters) by Patrick von Platen to the
-challenge. I could not see any license information in the MMS blog post.
+challenge. We use Python scripts, not notebooks, because we're not savages. I
+could not see any license information in the MMS blog post.
 
 [ESPNet](https://github.com/espnet/espnet/tree/master) is [Apache
 2.0](./LICENSE) licensed. The forked version of ESPNet used in the *MMS-10min*

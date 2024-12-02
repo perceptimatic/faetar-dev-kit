@@ -167,6 +167,7 @@ class Options(object):
     lang: str = "fae"  # There's no Faetar ISO 639 code, but "fae" isn't mapped yet
     prune_count: int = 0
     append: bool = False
+    premade_counts: bool = False
 
     # write-vocab args
     metadata_csv: pathlib.Path
@@ -232,7 +233,12 @@ class Options(object):
             default=False,
             help="Add language to existing file",
         )
-
+        parser.add_argument(
+            "--premade-counts",
+            action="store_true",
+            default=False,
+            help="Use existing vocab file containing counts of each token in a dict",
+        )
         cls._add_argument(
             parser,
             "metadata_csv",

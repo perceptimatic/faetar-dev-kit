@@ -30,6 +30,7 @@ import numpy as np
 from safetensors.torch import save_file as safe_save_file
 from transformers import (
     Wav2Vec2CTCTokenizer,
+    Wav2Vec2FeatureExtractor,
     Wav2Vec2Processor,
     HubertForCTC,
     TrainingArguments,
@@ -96,17 +97,19 @@ class TrainingRoutines:
 
 
 def train(options: Options):
-
-    processor = Wav2Vec2Processor.from_pretrained(
+    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
         options.pretrained_model_id,
     )
-    processor.tokenizer = Wav2Vec2CTCTokenizer(
+    
+    tokenizer = Wav2Vec2CTCTokenizer(
         options.vocab_json,
         unk_token=options.unk,
         pad_token=options.pad,
         word_delimiter_token=options.word_delimiter,
         target_lang="fae",
     )
+
+    processor = Wav2Vec2Processor(feature_extractor, tokenizer)
 
     with open(options.wav2vec2_kwargs_json) as fp:
         wav2vec2_kwargs: dict[str, Any] = json.load(fp)
