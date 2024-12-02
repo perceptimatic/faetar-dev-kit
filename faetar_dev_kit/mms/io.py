@@ -57,7 +57,7 @@ def compile_metadata(options: Options):
 
 def write_vocab(options: Options):
 
-    if options.append:
+    if options.append or options.premade_counts:
         with options.vocab_json.open() as fp:
             vocab_json = json.load(fp)
     else:
@@ -65,7 +65,7 @@ def write_vocab(options: Options):
 
     csv = DictReader(options.metadata_csv.open(newline=""), delimiter=",")
 
-    vocab2count = Counter()
+    vocab2count = Counter(vocab_json)
     for no, row in enumerate(csv):
         for word in row["sentence"].strip().split():
             if word.startswith("["):
@@ -77,7 +77,8 @@ def write_vocab(options: Options):
                     )
                     return 1
                 word = (word,)
-            vocab2count.update(word)
+            if not options.premade_counts:
+                vocab2count.update(word)
 
     if options.pad in vocab2count:
         print(
@@ -111,6 +112,9 @@ def write_vocab(options: Options):
     vocab.append(options.word_delimiter)
     vocab.append(options.unk)
     vocab.append(options.pad)
+
+    if options.premade_counts:
+        vocab_json = dict()
 
     vocab_json[options.lang] = dict((k, v) for (v, k) in enumerate(vocab))
     del vocab

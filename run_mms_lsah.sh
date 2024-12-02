@@ -17,7 +17,7 @@
 export PYTHONUTF8=1
 [ -f "path.sh" ] && . "path.sh"
 
-usage="Usage: $0 [-h] [-o] [-e DIR] [-d DIR] [-m DIR] [-w NAT] [-a NAT] [-b NAT] [-l NNINT]"
+usage="Usage: $0 [-h] [-o] [-e DIR] [-d DIR] [-m DIR] [-w NAT] [-a NAT] [-b NAT] [-l NNINT] [-s NAT]"
 only=false
 exp=exp/mms_lsah
 data=data/mms_lsah
@@ -59,8 +59,8 @@ while getopts "hoe:d:m:c:C:w:a:B:l:s:" name; do
             exp="$OPTARG";;
         d)
             data="$OPTARG";;
-	m)
-	    model="$OPTARG";;
+        m)
+            model="$OPTARG";;
         c)
             training_kwargs="$OPTARG";;
         C)
